@@ -1,37 +1,34 @@
 ## Mål
-Ge admin en dedikerad projekt- och kundhantering samt sammanställning av tid per projekt/kund.
+Lägga till **startdatum** och **slutdatum** på projekt, och använda dem för att filtrera projektlistan vid tidsregistrering så att endast aktiva projekt visas.
 
-## 1. Projekt- och kundredigering (admin)
-- Utöka `ProjectsDialog` i `src/routes/_authenticated/index.tsx` med en redigera-knapp (penna) per projekt som admin – öppnar inline-fält för att ändra **namn**, **kund** och **färg**, sparas via `supabase.from("projects").update(...)`.
-- Lägg till färgväljare (enkel input `type="color"`) även vid skapande.
-- Befintlig RLS tillåter redan admin att uppdatera – inga DB-ändringar krävs.
+## 1. Databas
+Migration på `public.projects`:
+- Ny kolumn `start_date date` (nullable).
+- Ny kolumn `end_date date` (nullable).
+- Båda valfria — saknat startdatum = alltid aktivt från start, saknat slutdatum = pågår tills vidare.
 
-## 2. Egen kundlista (smidigare hantering)
-Kunder finns idag bara som fri text på projekt. För att kunna sammanställa per kund konsekvent:
-- Migration: ny tabell `public.clients` (namn, ev. anteckning) med GRANT + RLS (alla auth läser, endast admin skriver). Lägg till `client_id uuid` i `projects` (nullable, FK till `clients`). Behåll gamla `projects.client`-textfältet för bakåtkompatibilitet men markera som legacy.
-- Engångs-backfill i samma migration: skapa `clients`-rader från distinkta `projects.client`-värden och fyll `projects.client_id`.
+## 2. Admin – Projekt & kunder (`src/routes/_authenticated/admin-projects.tsx`)
+- Lägg till två datumfält vid både **skapa** och **redigera** projekt:
+  - Textinput (`YYYY-MM-DD`) som kan skrivas manuellt
+  - Kalenderikon-knapp som öppnar shadcn-kalender (svensk lokal, mån-start) i en Popover
+- Visa start–slut i projektlistan under projektnamnet (t.ex. "2026-01-01 → 2026-12-31", "→ 2026-06-30", "från 2026-03-01" eller "—" om inget angetts).
+- Spara fälten via befintlig `supabase.from("projects").update/insert`.
 
-## 3. Admin-sida: projekt & kunder
-Ny route `src/routes/_authenticated/admin.projects.tsx` (länk från admin-sidan):
-- Sektion **Kunder**: lista + skapa/ändra/ta bort.
-- Sektion **Projekt**: lista alla projekt, koppling till kund via dropdown, namn, färg – skapa/ändra/ta bort.
-- Skydd: kontrollerar `isAdmin` (befintlig serverfunktion); annars "Forbidden"-meddelande.
+## 3. Filtrering vid tidsregistrering
+I projektdropdownen på två ställen:
+- `src/routes/_authenticated/index.tsx` (timer + Lägg till tid-dialogen) – filtrera mot postens datum (timern = idag, manuell post = valt datum).
+- `src/routes/_authenticated/admin.tsx` (admins EntryDialog) – filtrera mot valt datum för posten.
 
-## 4. Sammanställning per projekt/kund
-Ny route `src/routes/_authenticated/admin.summary.tsx`:
-- Datumintervall (från/till med kalender, default innevarande månad).
-- Filter: användare (alla / specifik), kund, projekt.
-- Två tabeller:
-  - **Per kund**: total tid, antal poster, andel %.
-  - **Per projekt**: total tid, kund, antal poster, andel %.
-- Detaljerad rad per användare inom valt projekt/kund (expanderbart).
-- CSV-export av sammanställningen.
-- Datat hämtas via ny serverfunktion `adminGetSummary({from, to, userId?, clientId?, projectId?})` i `src/lib/admin.functions.ts` som aggregerar `time_entries` joinat med `projects` (+ `clients`).
+Regel för "aktivt projekt vid datum D":
+- `start_date` saknas ELLER `start_date <= D`, OCH
+- `end_date` saknas ELLER `end_date >= D`.
 
-## 5. Navigation
-På `src/routes/_authenticated/admin.tsx`: lägg till två knappar/länkar högst upp – "Projekt & kunder" och "Sammanställning".
+Befintliga tidsposter kopplade till numera inaktiva projekt visas fortfarande i listor; filtreringen gäller bara valbarheten vid nyregistrering/redigering.
+
+## 4. Sammanställning
+Ingen ändring av sammanställningen i detta steg – datumen styr bara val. (Kan utökas senare om du vill kunna filtrera rapporter på projektens period.)
 
 ## Tekniskt
-- Inga ändringar av tidsregistreringens UI för vanliga användare; de väljer fortsatt projekt som idag (visningsetiketten kan utökas till `Projekt – Kund`).
-- Allt skrivande mot `projects`/`clients` sker via vanlig supabase-klient (RLS säkrar admin-only).
-- Sammanställningen körs serverside för att kunna aggregera över alla användares tider (RLS-bypass via `requireSupabaseAuth` + admin-check, samma mönster som befintliga admin-functions).
+- RLS oförändrad — admin har redan write på `projects`.
+- TypeScript-typer för `projects` regenereras automatiskt efter migrationen, så de nya fälten är typsäkra i koden.
+- Hantering av ogiltig manuell datumsträng: röd ram, sparning blockeras (samma mönster som tidsfälten).

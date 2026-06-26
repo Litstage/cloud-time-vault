@@ -9,7 +9,10 @@ import { Label } from "@/components/ui/label";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, Plus, Pencil, Trash2, Save, X } from "lucide-react";
+import { ArrowLeft, Plus, Pencil, Trash2, Save, X, CalendarIcon } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { isAdmin } from "@/lib/admin.functions";
@@ -31,7 +34,66 @@ type Project = {
   color: string;
   client_id: string | null;
   client: string | null;
+  start_date: string | null;
+  end_date: string | null;
 };
+
+function ymdToDate(s: string | null): Date | undefined {
+  if (!s) return undefined;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (!m) return undefined;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return isNaN(d.getTime()) ? undefined : d;
+}
+function dateToYmd(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+function isValidYmdOrEmpty(s: string): boolean {
+  if (!s.trim()) return true;
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(new Date(s).getTime());
+}
+function fmtRange(s: string | null, e: string | null): string {
+  if (!s && !e) return "—";
+  if (s && e) return `${s} → ${e}`;
+  if (s) return `från ${s}`;
+  return `→ ${e}`;
+}
+
+function DateField({ value, onChange, valid }: { value: string; onChange: (v: string) => void; valid: boolean }) {
+  const d = ymdToDate(value);
+  return (
+    <div className="flex gap-2">
+      <Input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="ÅÅÅÅ-MM-DD (valfritt)"
+        inputMode="numeric"
+        className={cn("flex-1", !valid && "border-destructive")}
+      />
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button variant="outline" size="icon" aria-label="Öppna kalender">
+            <CalendarIcon className="h-4 w-4" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="end">
+          <Calendar
+            mode="single"
+            selected={d}
+            onSelect={(picked) => picked && onChange(dateToYmd(picked))}
+            initialFocus
+            className={cn("p-3 pointer-events-auto")}
+          />
+        </PopoverContent>
+      </Popover>
+      {value && (
+        <Button variant="ghost" size="icon" onClick={() => onChange("")} aria-label="Rensa">
+          <X className="h-4 w-4" />
+        </Button>
+      )}
+    </div>
+  );
+}
 
 function AdminProjectsPage() {
   const checkAdmin = useServerFn(isAdmin);
@@ -56,7 +118,7 @@ function AdminProjectsPage() {
     queryFn: async (): Promise<Project[]> => {
       const { data, error } = await supabase
         .from("projects")
-        .select("id, name, color, client_id, client")
+        .select("id, name, color, client_id, client, start_date, end_date")
         .order("name");
       if (error) throw error;
       return (data ?? []) as unknown as Project[];
@@ -119,14 +181,20 @@ function AdminProjectsPage() {
   const [newProjName, setNewProjName] = useState("");
   const [newProjClient, setNewProjClient] = useState<string>("none");
   const [newProjColor, setNewProjColor] = useState(COLORS[5]);
+  const [newProjStart, setNewProjStart] = useState("");
+  const [newProjEnd, setNewProjEnd] = useState("");
   const [editingProj, setEditingProj] = useState<Project | null>(null);
   const [editProjName, setEditProjName] = useState("");
   const [editProjClient, setEditProjClient] = useState<string>("none");
   const [editProjColor, setEditProjColor] = useState(COLORS[5]);
+  const [editProjStart, setEditProjStart] = useState("");
+  const [editProjEnd, setEditProjEnd] = useState("");
 
   const addProject = useMutation({
     mutationFn: async () => {
       if (!newProjName.trim()) throw new Error("Namn krävs");
+      if (!isValidYmdOrEmpty(newProjStart)) throw new Error("Ogiltigt startdatum");
+      if (!isValidYmdOrEmpty(newProjEnd)) throw new Error("Ogiltigt slutdatum");
       const { data: u } = await supabase.auth.getUser();
       if (!u.user) throw new Error("Inte inloggad");
       const clientId = newProjClient === "none" ? null : newProjClient;
@@ -137,6 +205,8 @@ function AdminProjectsPage() {
         color: newProjColor,
         client_id: clientId,
         client: clientName,
+        start_date: newProjStart.trim() || null,
+        end_date: newProjEnd.trim() || null,
       } as any);
       if (error) throw new Error(error.message);
     },
@@ -144,6 +214,7 @@ function AdminProjectsPage() {
       qc.invalidateQueries({ queryKey: ["projects-admin"] });
       qc.invalidateQueries({ queryKey: ["projects"] });
       setNewProjName(""); setNewProjClient("none"); setNewProjColor(COLORS[5]);
+      setNewProjStart(""); setNewProjEnd("");
       toast.success("Projekt tillagt");
     },
     onError: (e: Error) => toast.error(e.message),
@@ -152,6 +223,8 @@ function AdminProjectsPage() {
   const updateProject = useMutation({
     mutationFn: async () => {
       if (!editingProj) return;
+      if (!isValidYmdOrEmpty(editProjStart)) throw new Error("Ogiltigt startdatum");
+      if (!isValidYmdOrEmpty(editProjEnd)) throw new Error("Ogiltigt slutdatum");
       const clientId = editProjClient === "none" ? null : editProjClient;
       const clientName = clientId ? clientsQ.data?.find((c) => c.id === clientId)?.name ?? null : null;
       const { error } = await supabase
@@ -161,6 +234,8 @@ function AdminProjectsPage() {
           color: editProjColor,
           client_id: clientId,
           client: clientName,
+          start_date: editProjStart.trim() || null,
+          end_date: editProjEnd.trim() || null,
         } as any)
         .eq("id", editingProj.id);
       if (error) throw new Error(error.message);
@@ -192,6 +267,8 @@ function AdminProjectsPage() {
     setEditProjName(p.name);
     setEditProjClient(p.client_id ?? "none");
     setEditProjColor(p.color);
+    setEditProjStart(p.start_date ?? "");
+    setEditProjEnd(p.end_date ?? "");
   }
   function startEditClient(c: Client) {
     setEditingClient(c);
@@ -312,6 +389,16 @@ function AdminProjectsPage() {
                     />
                   ))}
                 </div>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Startdatum</Label>
+                    <DateField value={newProjStart} onChange={setNewProjStart} valid={isValidYmdOrEmpty(newProjStart)} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Slutdatum</Label>
+                    <DateField value={newProjEnd} onChange={setNewProjEnd} valid={isValidYmdOrEmpty(newProjEnd)} />
+                  </div>
+                </div>
                 <div className="flex justify-end">
                   <Button size="sm" disabled={!newProjName.trim() || addProject.isPending} onClick={() => addProject.mutate()}>
                     <Plus className="mr-1 h-4 w-4" /> Lägg till projekt
@@ -353,6 +440,16 @@ function AdminProjectsPage() {
                                 />
                               ))}
                             </div>
+                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                              <div className="space-y-1">
+                                <Label className="text-xs">Startdatum</Label>
+                                <DateField value={editProjStart} onChange={setEditProjStart} valid={isValidYmdOrEmpty(editProjStart)} />
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-xs">Slutdatum</Label>
+                                <DateField value={editProjEnd} onChange={setEditProjEnd} valid={isValidYmdOrEmpty(editProjEnd)} />
+                              </div>
+                            </div>
                             <div className="flex justify-end gap-2">
                               <Button size="sm" variant="ghost" onClick={() => setEditingProj(null)}>Avbryt</Button>
                               <Button size="sm" onClick={() => updateProject.mutate()} disabled={updateProject.isPending}>
@@ -365,7 +462,9 @@ function AdminProjectsPage() {
                             <div className="h-3 w-3 rounded-full" style={{ background: p.color }} />
                             <div className="min-w-0 flex-1">
                               <div className="text-sm font-medium">{p.name}</div>
-                              <div className="text-xs text-muted-foreground">{clientName ?? "Ingen kund"}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {clientName ?? "Ingen kund"} · {fmtRange(p.start_date, p.end_date)}
+                              </div>
                             </div>
                             <Button size="icon" variant="ghost" onClick={() => startEditProject(p)} title="Redigera">
                               <Pencil className="h-4 w-4" />

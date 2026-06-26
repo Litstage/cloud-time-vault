@@ -296,17 +296,17 @@ function AdminPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  type ProjectLite = { id: string; name: string; color: string };
+  type ProjectLite = { id: string; name: string; color: string; start_date: string | null; end_date: string | null };
   const projectsQ = useQuery({
     queryKey: ["projects"],
     enabled: !!adminQ.data?.isAdmin,
     queryFn: async (): Promise<ProjectLite[]> => {
       const { data, error } = await supabase
         .from("projects")
-        .select("id, name, color")
+        .select("id, name, color, start_date, end_date")
         .order("name");
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []) as unknown as ProjectLite[];
     },
   });
 
@@ -754,7 +754,13 @@ function AdminPage() {
   );
 }
 
-type ProjectLite = { id: string; name: string; color: string };
+type ProjectLite = { id: string; name: string; color: string; start_date: string | null; end_date: string | null };
+
+function isProjectActiveYmd(p: { start_date: string | null; end_date: string | null }, ymd: string): boolean {
+  if (p.start_date && p.start_date > ymd) return false;
+  if (p.end_date && p.end_date < ymd) return false;
+  return true;
+}
 type EntryFormBase = {
   projectId: string | null;
   description: string | null;
@@ -1026,7 +1032,7 @@ function EntryDialog(props: {
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">Inget projekt</SelectItem>
-                {projects.map((p) => (
+                {projects.filter((p) => !dateValid || isProjectActiveYmd(p, dateText)).map((p) => (
                   <SelectItem key={p.id} value={p.id}>
                     <span style={{ color: p.color }}>● </span>{p.name}
                   </SelectItem>
