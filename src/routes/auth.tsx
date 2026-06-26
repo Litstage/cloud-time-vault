@@ -22,6 +22,7 @@ function AuthPage() {
   const navigate = useNavigate();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -33,7 +34,10 @@ function AuthPage() {
         const { error } = await supabase.auth.signUp({
           email,
           password,
-          options: { emailRedirectTo: window.location.origin },
+          options: {
+            emailRedirectTo: window.location.origin,
+            data: phone.trim() ? { phone: phone.trim() } : {},
+          },
         });
         if (error) throw error;
         toast.success("Konto skapat! Kolla din e-post om bekräftelse krävs.");
@@ -65,6 +69,20 @@ function AuthPage() {
               <Label htmlFor="email">E-post</Label>
               <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
             </div>
+            {mode === "signup" && (
+              <div className="space-y-2">
+                <Label htmlFor="phone">Telefonnummer</Label>
+                <Input
+                  id="phone"
+                  type="tel"
+                  required
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  autoComplete="tel"
+                  placeholder="+46 70 123 45 67"
+                />
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="password">Lösenord</Label>
               <Input id="password" type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={mode === "signup" ? "new-password" : "current-password"} />

@@ -15,6 +15,7 @@ export type AdminEntry = {
 export type ManagedUser = {
   user_id: string;
   email: string | null;
+  phone: string | null;
   created_at: string;
   status: "pending" | "approved" | "rejected";
   approved_at: string | null;
@@ -98,6 +99,10 @@ export const listManagedUsers = createServerFn({ method: "GET" })
         users.push({
           user_id: u.id,
           email: u.email ?? null,
+          phone:
+            (u.user_metadata as any)?.phone ??
+            (u.phone as string | undefined) ??
+            null,
           created_at: u.created_at,
           status: (a?.status as ManagedUser["status"]) ?? "pending",
           approved_at: (a?.approved_at as string | null) ?? null,
@@ -181,6 +186,55 @@ export const deleteManagedUser = createServerFn({ method: "POST" })
     const { error } = await supabaseAdmin.auth.admin.deleteUser(data.userId);
     if (error) throw new Error(error.message);
     return { ok: true };
+  });
+
+export const createManagedUser = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    (d: { email: string; password: string; phone?: string; approve?: boolean; makeAdmin?: boolean }) => {
+      const email = (d.email ?? "").trim();
+      const password = d.password ?? "";
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Ogiltig e-post");
+      if (password.length < 6) throw new Error("Lösenord måste vara minst 6 tecken");
+      const phone = (d.phone ?? "").trim();
+      return {
+        email,
+        password,
+        phone: phone || undefined,
+        approve: d.approve !== false,
+        makeAdmin: Boolean(d.makeAdmin),
+      };
+    },
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: created, error } = await supabaseAdmin.auth.admin.createUser({
+      email: data.email,
+      password: data.password,
+      email_confirm: true,
+      user_metadata: data.phone ? { phone: data.phone } : {},
+    });
+    if (error) throw new Error(error.message);
+    const newId = created.user?.id;
+    if (!newId) throw new Error("Kunde inte skapa användare");
+    if (data.approve || data.makeAdmin) {
+      await supabaseAdmin.from("user_approvals").upsert(
+        {
+          user_id: newId,
+          status: "approved",
+          approved_at: new Date().toISOString(),
+          approved_by: context.userId,
+        },
+        { onConflict: "user_id" },
+      );
+    }
+    if (data.makeAdmin) {
+      await supabaseAdmin
+        .from("user_roles")
+        .upsert({ user_id: newId, role: "admin" }, { onConflict: "user_id,role" });
+    }
+    return { ok: true, userId: newId };
   });
 
 export const getAllTimeEntries = createServerFn({ method: "GET" })
