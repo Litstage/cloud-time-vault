@@ -572,9 +572,17 @@ function AdminPage() {
             </section>
 
             <section className="space-y-2">
-              <h2 className="px-1 text-sm font-medium text-muted-foreground">
-                Alla poster ({rows.length})
-              </h2>
+              <div className="flex items-center justify-between px-1">
+                <h2 className="text-sm font-medium text-muted-foreground">
+                  Alla poster ({rows.length})
+                </h2>
+                <Button
+                  size="sm"
+                  onClick={() => { setEditingEntry(null); setEntryDialogOpen(true); }}
+                >
+                  <Plus className="mr-1 h-4 w-4" /> Lägg till tid
+                </Button>
+              </div>
               <Card className="overflow-x-auto p-0">
                 <table className="w-full text-sm">
                   <thead className="bg-muted/50 text-left text-xs uppercase text-muted-foreground">
@@ -584,6 +592,7 @@ function AdminPage() {
                       <th className="px-3 py-2">Projekt</th>
                       <th className="px-3 py-2">Beskrivning</th>
                       <th className="px-3 py-2 text-right">Timmar</th>
+                      <th className="px-3 py-2"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
@@ -609,6 +618,29 @@ function AdminPage() {
                           <td className="px-3 py-2 text-right font-mono tabular-nums">
                             {r.end_time ? formatHours(ms) : "–"}
                           </td>
+                          <td className="px-3 py-2 whitespace-nowrap text-right">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              title="Redigera"
+                              onClick={() => { setEditingEntry(r); setEntryDialogOpen(true); }}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              title="Ta bort"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => {
+                                if (confirm("Ta bort denna tidspost?")) {
+                                  deleteEntryMut.mutate(r.id);
+                                }
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </td>
                         </tr>
                       );
                     })}
@@ -619,6 +651,17 @@ function AdminPage() {
           </>
         )}
       </main>
+
+      <EntryDialog
+        open={entryDialogOpen}
+        onOpenChange={(v) => { setEntryDialogOpen(v); if (!v) setEditingEntry(null); }}
+        entry={editingEntry}
+        users={usersQ.data ?? []}
+        projects={projectsQ.data ?? []}
+        onCreate={(v) => createEntryMut.mutate(v)}
+        onUpdate={(v) => updateEntryMut.mutate(v)}
+        saving={createEntryMut.isPending || updateEntryMut.isPending}
+      />
 
       <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
         <DialogContent>
