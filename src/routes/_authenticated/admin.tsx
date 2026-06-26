@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Download, ShieldCheck, Check, X, Trash2, Shield, ShieldOff, RotateCcw } from "lucide-react";
+import { ArrowLeft, Download, ShieldCheck, Check, X, Trash2, Shield, ShieldOff, RotateCcw, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import {
   isAdmin,
@@ -16,6 +16,7 @@ import {
   setUserApproval,
   setUserAdmin,
   deleteManagedUser,
+  createManagedUser,
   type AdminEntry,
   type ManagedUser,
 } from "@/lib/admin.functions";
@@ -93,6 +94,7 @@ function UsersSection(props: {
                   <StatusBadge status={u.status} />
                 </div>
                 <div className="text-xs text-muted-foreground">
+                  {u.phone ? <>Tel: {u.phone} · </> : null}
                   Skapad {new Date(u.created_at).toLocaleDateString("sv-SE")}
                 </div>
               </div>
@@ -167,6 +169,7 @@ function AdminPage() {
   const setApproval = useServerFn(setUserApproval);
   const setAdmin = useServerFn(setUserAdmin);
   const deleteUser = useServerFn(deleteManagedUser);
+  const createUser = useServerFn(createManagedUser);
   const qc = useQueryClient();
 
   const today = new Date();
@@ -212,6 +215,25 @@ function AdminPage() {
       qc.invalidateQueries({ queryKey: ["managed-users"] });
       qc.invalidateQueries({ queryKey: ["admin-entries"] });
       toast.success("Användare borttagen");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const [newEmail, setNewEmail] = useState("");
+  const [newPhone, setNewPhone] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [newMakeAdmin, setNewMakeAdmin] = useState(false);
+
+  const createMut = useMutation({
+    mutationFn: (v: { email: string; password: string; phone: string; makeAdmin: boolean }) =>
+      createUser({ data: { email: v.email, password: v.password, phone: v.phone, approve: true, makeAdmin: v.makeAdmin } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["managed-users"] });
+      toast.success("Användare skapad och godkänd");
+      setNewEmail("");
+      setNewPhone("");
+      setNewPassword("");
+      setNewMakeAdmin(false);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -323,6 +345,64 @@ function AdminPage() {
           </Card>
         ) : (
           <>
+            <section className="space-y-2">
+              <h2 className="px-1 text-sm font-medium text-muted-foreground">Skapa användare</h2>
+              <Card className="space-y-3 p-4">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs">E-post</Label>
+                    <Input
+                      type="email"
+                      value={newEmail}
+                      onChange={(e) => setNewEmail(e.target.value)}
+                      placeholder="namn@exempel.se"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Telefonnummer</Label>
+                    <Input
+                      type="tel"
+                      value={newPhone}
+                      onChange={(e) => setNewPhone(e.target.value)}
+                      placeholder="+46 70 123 45 67"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Lösenord (minst 6 tecken)</Label>
+                    <Input
+                      type="text"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="Tillfälligt lösenord"
+                    />
+                  </div>
+                  <label className="flex items-center gap-2 self-end text-sm">
+                    <input
+                      type="checkbox"
+                      checked={newMakeAdmin}
+                      onChange={(e) => setNewMakeAdmin(e.target.checked)}
+                    />
+                    Gör till admin
+                  </label>
+                </div>
+                <div className="flex justify-end">
+                  <Button
+                    onClick={() =>
+                      createMut.mutate({
+                        email: newEmail,
+                        password: newPassword,
+                        phone: newPhone,
+                        makeAdmin: newMakeAdmin,
+                      })
+                    }
+                    disabled={createMut.isPending || !newEmail || !newPassword}
+                  >
+                    <UserPlus className="mr-2 h-4 w-4" /> Skapa
+                  </Button>
+                </div>
+              </Card>
+            </section>
+
             <UsersSection
               users={usersQ.data ?? []}
               loading={usersQ.isLoading}
