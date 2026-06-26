@@ -218,6 +218,13 @@ function AdminPage() {
     queryFn: () => checkAdmin({ data: undefined }),
   });
 
+  const auditFn = useServerFn(getAuditLog);
+  const auditQ = useQuery({
+    queryKey: ["audit-log"],
+    enabled: !!adminQ.data?.isAdmin,
+    queryFn: () => auditFn({ data: { limit: 200 } }),
+  });
+
   const usersQ = useQuery({
     queryKey: ["managed-users"],
     enabled: !!adminQ.data?.isAdmin,
