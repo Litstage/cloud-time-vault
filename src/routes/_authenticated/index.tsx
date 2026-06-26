@@ -553,7 +553,7 @@ function ManualEntryDialog({ open, onOpenChange, projects }: { open: boolean; on
               <SelectTrigger className="h-12 text-base"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">Inget projekt</SelectItem>
-                {projects.map((p) => (
+                {projects.filter((p) => !dateValid || isProjectActive(p, dateText)).map((p) => (
                   <SelectItem key={p.id} value={p.id}>
                     <span style={{ color: p.color }}>● </span>{p.name}
                   </SelectItem>
