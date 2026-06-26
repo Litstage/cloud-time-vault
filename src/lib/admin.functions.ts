@@ -465,8 +465,8 @@ async function logAudit(
     entry_id: string | null;
     entry_user_id: string | null;
     action: "create" | "update" | "delete";
-    before_data: Record<string, unknown> | null;
-    after_data: Record<string, unknown> | null;
+    before_data: Json | null;
+    after_data: Json | null;
   },
 ) {
   const changedByEmail =
