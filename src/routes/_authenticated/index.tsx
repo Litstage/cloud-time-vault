@@ -15,7 +15,7 @@ import {
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Play, Square, Plus, Download, LogOut, FolderKanban, Trash2, MoreVertical, BarChart3 } from "lucide-react";
+import { Play, Square, Plus, Download, LogOut, FolderKanban, Trash2, MoreVertical, BarChart3, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/")({
@@ -177,6 +177,9 @@ function HomePage() {
             <DropdownMenuContent align="end">
               <DropdownMenuItem asChild>
                 <Link to="/overview"><BarChart3 className="mr-2 h-4 w-4" /> Månadsöversikt</Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link to="/admin"><ShieldCheck className="mr-2 h-4 w-4" /> Admin</Link>
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setProjectsOpen(true)}>
                 <FolderKanban className="mr-2 h-4 w-4" /> Projekt
