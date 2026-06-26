@@ -1032,7 +1032,7 @@ function EntryDialog(props: {
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">Inget projekt</SelectItem>
-                {projects.map((p) => (
+                {projects.filter((p) => !dateValid || isProjectActiveYmd(p, dateText)).map((p) => (
                   <SelectItem key={p.id} value={p.id}>
                     <span style={{ color: p.color }}>● </span>{p.name}
                   </SelectItem>
