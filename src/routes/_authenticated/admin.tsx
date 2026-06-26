@@ -313,6 +313,7 @@ function AdminPage() {
     }) => createEntryFn({ data: v }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-entries"] });
+      qc.invalidateQueries({ queryKey: ["audit-log"] });
       toast.success("Tid tillagd");
       setEntryDialogOpen(false);
       setEditingEntry(null);
@@ -327,6 +328,7 @@ function AdminPage() {
     }) => updateEntryFn({ data: v }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-entries"] });
+      qc.invalidateQueries({ queryKey: ["audit-log"] });
       toast.success("Tid uppdaterad");
       setEntryDialogOpen(false);
       setEditingEntry(null);
