@@ -33,7 +33,7 @@ export const Route = createFileRoute("/_authenticated/")({
   ),
 });
 
-type Project = { id: string; name: string; client: string | null; color: string };
+type Project = { id: string; name: string; client: string | null; color: string; start_date: string | null; end_date: string | null };
 type Entry = {
   id: string;
   description: string | null;
@@ -57,6 +57,16 @@ function getIsoWeek(date: Date) {
   d.setUTCDate(d.getUTCDate() + 4 - day);
   const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
   return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+}
+
+function isProjectActive(p: { start_date: string | null; end_date: string | null }, ymd: string): boolean {
+  if (p.start_date && p.start_date > ymd) return false;
+  if (p.end_date && p.end_date < ymd) return false;
+  return true;
+}
+function todayYmd(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 function HomePage() {
@@ -90,9 +100,9 @@ function HomePage() {
   const projectsQ = useQuery({
     queryKey: ["projects"],
     queryFn: async (): Promise<Project[]> => {
-      const { data, error } = await supabase.from("projects").select("*").order("created_at", { ascending: false });
+      const { data, error } = await supabase.from("projects").select("*").order("name");
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []) as unknown as Project[];
     },
   });
 
@@ -278,7 +288,7 @@ function HomePage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">Inget projekt</SelectItem>
-                    {projectsQ.data?.map((p) => (
+                    {projectsQ.data?.filter((p) => isProjectActive(p, todayYmd())).map((p) => (
                       <SelectItem key={p.id} value={p.id}>
                         <span style={{ color: p.color }}>● </span>{p.name}
                       </SelectItem>
