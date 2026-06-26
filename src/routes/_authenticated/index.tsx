@@ -59,6 +59,7 @@ function HomePage() {
   const [projectId, setProjectId] = useState<string>("none");
   const [manualOpen, setManualOpen] = useState(false);
   const [projectsOpen, setProjectsOpen] = useState(false);
+  const [range, setRange] = useState<"day" | "week" | "month">("day");
   const [filterDate, setFilterDate] = useState<Date>(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -170,20 +171,31 @@ function HomePage() {
 
   const grouped = useMemo(() => {
     const map = new Map<string, Entry[]>();
-    const day0 = new Date(filterDate);
-    day0.setHours(0, 0, 0, 0);
-    const day1 = new Date(day0);
-    day1.setDate(day1.getDate() + 1);
+    const start = new Date(filterDate);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(start);
+    if (range === "day") {
+      end.setDate(end.getDate() + 1);
+    } else if (range === "week") {
+      const dow = (start.getDay() + 6) % 7;
+      start.setDate(start.getDate() - dow);
+      end.setTime(start.getTime());
+      end.setDate(end.getDate() + 7);
+    } else {
+      start.setDate(1);
+      end.setTime(start.getTime());
+      end.setMonth(end.getMonth() + 1);
+    }
     for (const e of entriesQ.data ?? []) {
       if (!e.end_time) continue;
       const t = new Date(e.start_time).getTime();
-      if (t < day0.getTime() || t >= day1.getTime()) continue;
+      if (t < start.getTime() || t >= end.getTime()) continue;
       const day = new Date(e.start_time).toLocaleDateString("sv-SE", { weekday: "long", day: "numeric", month: "long" });
       if (!map.has(day)) map.set(day, []);
       map.get(day)!.push(e);
     }
     return Array.from(map.entries());
-  }, [entriesQ.data, filterDate]);
+  }, [entriesQ.data, filterDate, range]);
 
   const totals = useMemo(() => {
     const totals = new Map<string, number>();
