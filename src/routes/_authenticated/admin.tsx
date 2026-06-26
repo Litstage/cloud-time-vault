@@ -1,14 +1,24 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Download, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Download, ShieldCheck, Check, X, Trash2, Shield, ShieldOff, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
-import { isAdmin, claimFirstAdmin, getAllTimeEntries, type AdminEntry } from "@/lib/admin.functions";
+import {
+  isAdmin,
+  claimFirstAdmin,
+  getAllTimeEntries,
+  listManagedUsers,
+  setUserApproval,
+  setUserAdmin,
+  deleteManagedUser,
+  type AdminEntry,
+  type ManagedUser,
+} from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({ meta: [{ title: "Admin – Tidskoll" }] }),
@@ -23,6 +33,11 @@ function AdminPage() {
   const checkAdmin = useServerFn(isAdmin);
   const claim = useServerFn(claimFirstAdmin);
   const fetchAll = useServerFn(getAllTimeEntries);
+  const fetchUsers = useServerFn(listManagedUsers);
+  const setApproval = useServerFn(setUserApproval);
+  const setAdmin = useServerFn(setUserAdmin);
+  const deleteUser = useServerFn(deleteManagedUser);
+  const qc = useQueryClient();
 
   const today = new Date();
   const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
@@ -34,6 +49,41 @@ function AdminPage() {
   const adminQ = useQuery({
     queryKey: ["is-admin"],
     queryFn: () => checkAdmin({ data: undefined }),
+  });
+
+  const usersQ = useQuery({
+    queryKey: ["managed-users"],
+    enabled: !!adminQ.data?.isAdmin,
+    queryFn: () => fetchUsers({ data: undefined }),
+  });
+
+  const approvalMut = useMutation({
+    mutationFn: (v: { userId: string; status: "pending" | "approved" | "rejected" }) =>
+      setApproval({ data: v }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["managed-users"] });
+      toast.success("Status uppdaterad");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const adminMut = useMutation({
+    mutationFn: (v: { userId: string; isAdmin: boolean }) => setAdmin({ data: v }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["managed-users"] });
+      toast.success("Adminroll uppdaterad");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: (userId: string) => deleteUser({ data: { userId } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["managed-users"] });
+      qc.invalidateQueries({ queryKey: ["admin-entries"] });
+      toast.success("Användare borttagen");
+    },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const entriesQ = useQuery({
@@ -143,6 +193,21 @@ function AdminPage() {
           </Card>
         ) : (
           <>
+            <UsersSection
+              users={usersQ.data ?? []}
+              loading={usersQ.isLoading}
+              onApprove={(u) => approvalMut.mutate({ userId: u.user_id, status: "approved" })}
+              onReject={(u) => approvalMut.mutate({ userId: u.user_id, status: "rejected" })}
+              onReset={(u) => approvalMut.mutate({ userId: u.user_id, status: "pending" })}
+              onToggleAdmin={(u) => adminMut.mutate({ userId: u.user_id, isAdmin: !u.is_admin })}
+              onDelete={(u) => {
+                if (confirm(`Ta bort ${u.email ?? u.user_id}? Detta kan inte ångras.`)) {
+                  deleteMut.mutate(u.user_id);
+                }
+              }}
+              busy={approvalMut.isPending || adminMut.isPending || deleteMut.isPending}
+            />
+
             <Card className="p-4">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
