@@ -416,10 +416,30 @@ function ManualEntryDialog({ open, onOpenChange, projects }: { open: boolean; on
     d.setHours(0, 0, 0, 0);
     return d;
   });
+  const [dateText, setDateText] = useState<string>(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  });
   const [start, setStart] = useState("09:00");
   const [end, setEnd] = useState("10:00");
   const [description, setDescription] = useState("");
   const [projectId, setProjectId] = useState("none");
+
+  function syncDate(d: Date) {
+    setDate(d);
+    setDateText(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`);
+  }
+
+  function onDateTextChange(v: string) {
+    setDateText(v);
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v);
+    if (m) {
+      const parsed = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+      if (!isNaN(parsed.getTime())) setDate(parsed);
+    }
+  }
+
+  const dateValid = /^\d{4}-\d{2}-\d{2}$/.test(dateText) && !isNaN(new Date(dateText).getTime());
 
   async function save() {
     const { data: u } = await supabase.auth.getUser();
@@ -452,32 +472,40 @@ function ManualEntryDialog({ open, onOpenChange, projects }: { open: boolean; on
         <div className="space-y-5">
           <div className="space-y-2">
             <Label className="text-base">Datum</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className={cn("w-full justify-start text-left font-normal h-12 text-base")}>
-                  <CalendarIcon className="mr-2 h-5 w-5" />
-                  {date.toLocaleDateString("sv-SE", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={date}
-                  onSelect={(d) => d && setDate(d)}
-                  initialFocus
-                  className={cn("p-3 pointer-events-auto")}
-                />
-              </PopoverContent>
-            </Popover>
+            <div className="flex gap-2">
+              <Input
+                value={dateText}
+                onChange={(e) => onDateTextChange(e.target.value)}
+                placeholder="ÅÅÅÅ-MM-DD"
+                inputMode="numeric"
+                className={cn("h-12 text-base flex-1", !dateValid && "border-destructive")}
+              />
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="icon" className="h-12 w-12 shrink-0" aria-label="Öppna kalender">
+                    <CalendarIcon className="h-5 w-5" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="end">
+                  <Calendar
+                    mode="single"
+                    selected={date}
+                    onSelect={(d) => d && syncDate(d)}
+                    initialFocus
+                    className={cn("p-3 pointer-events-auto")}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label className="text-base">Start</Label>
-              <Input type="time" value={start} onChange={(e) => setStart(e.target.value)} className="h-12 text-base" />
+              <Input type="time" value={start} onChange={(e) => setStart(e.target.value)} className="h-12 text-base w-full min-w-0" />
             </div>
             <div className="space-y-2">
               <Label className="text-base">Slut</Label>
-              <Input type="time" value={end} onChange={(e) => setEnd(e.target.value)} className="h-12 text-base" />
+              <Input type="time" value={end} onChange={(e) => setEnd(e.target.value)} className="h-12 text-base w-full min-w-0" />
             </div>
           </div>
           <div className="space-y-2">
