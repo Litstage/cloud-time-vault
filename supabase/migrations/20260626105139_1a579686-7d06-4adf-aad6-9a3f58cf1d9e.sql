@@ -1,0 +1,4 @@
+CREATE POLICY "Admins can view all time entries" ON public.time_entries FOR SELECT TO authenticated USING (has_role(auth.uid(), 'admin'::app_role));
+CREATE POLICY "Admins can insert time entries" ON public.time_entries FOR INSERT TO authenticated WITH CHECK (has_role(auth.uid(), 'admin'::app_role));
+CREATE POLICY "Admins can update time entries" ON public.time_entries FOR UPDATE TO authenticated USING (has_role(auth.uid(), 'admin'::app_role)) WITH CHECK (has_role(auth.uid(), 'admin'::app_role));
+CREATE POLICY "Admins can delete time entries" ON public.time_entries FOR DELETE TO authenticated USING (has_role(auth.uid(), 'admin'::app_role));
