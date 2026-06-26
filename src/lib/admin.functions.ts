@@ -237,6 +237,41 @@ export const createManagedUser = createServerFn({ method: "POST" })
     return { ok: true, userId: newId };
   });
 
+export const updateManagedUser = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    (d: { userId: string; email?: string; phone?: string; password?: string }) => {
+      if (!d.userId) throw new Error("userId krävs");
+      const email = d.email?.trim();
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Ogiltig e-post");
+      const password = d.password ?? "";
+      if (password && password.length < 6) throw new Error("Lösenord måste vara minst 6 tecken");
+      return {
+        userId: d.userId,
+        email: email || undefined,
+        phone: d.phone !== undefined ? d.phone.trim() : undefined,
+        password: password || undefined,
+      };
+    },
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: existing, error: getErr } = await supabaseAdmin.auth.admin.getUserById(data.userId);
+    if (getErr) throw new Error(getErr.message);
+    const currentMeta = (existing.user?.user_metadata as Record<string, unknown> | null) ?? {};
+    const updates: Record<string, unknown> = {};
+    if (data.email) updates.email = data.email;
+    if (data.password) updates.password = data.password;
+    if (data.phone !== undefined) {
+      updates.user_metadata = { ...currentMeta, phone: data.phone || null };
+    }
+    if (Object.keys(updates).length === 0) return { ok: true };
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(data.userId, updates);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
 export const getAllTimeEntries = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { from?: string; to?: string } | undefined) => d ?? {})
