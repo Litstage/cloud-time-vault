@@ -1,0 +1,17 @@
+{
+  "name": "Tidskoll – Tidsregistrering",
+  "short_name": "Tidskoll",
+  "description": "Registrera tid, projekt och OB-ersättning",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#fef3c7",
+  "theme_color": "#d97706",
+  "lang": "sv-SE",
+  "icons": [
+    { "src": "/app-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/app-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/app-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

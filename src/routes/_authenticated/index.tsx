@@ -225,8 +225,8 @@ function HomePage() {
   }, [grouped]);
 
   return (
-    <div className="min-h-screen bg-background pb-12">
-      <header className="sticky top-0 z-10 border-b bg-background/80 backdrop-blur">
+    <div className="min-h-screen bg-background pb-12 safe-bottom">
+      <header className="sticky top-0 z-10 border-b bg-background/80 backdrop-blur safe-top">
         <div className="mx-auto flex max-w-2xl items-center justify-between px-4 py-3">
           <h1 className="text-lg font-semibold tracking-tight">Tidskoll</h1>
           <DropdownMenu>
