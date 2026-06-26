@@ -6,8 +6,15 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Download, ShieldCheck, Check, X, Trash2, Shield, ShieldOff, RotateCcw, UserPlus } from "lucide-react";
+import { ArrowLeft, Download, ShieldCheck, Check, X, Trash2, Shield, ShieldOff, RotateCcw, UserPlus, Pencil } from "lucide-react";
 import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   isAdmin,
   claimFirstAdmin,
@@ -17,6 +24,7 @@ import {
   setUserAdmin,
   deleteManagedUser,
   createManagedUser,
+  updateManagedUser,
   type AdminEntry,
   type ManagedUser,
 } from "@/lib/admin.functions";
@@ -57,6 +65,7 @@ function UsersSection(props: {
   onReset: (u: ManagedUser) => void;
   onToggleAdmin: (u: ManagedUser) => void;
   onDelete: (u: ManagedUser) => void;
+  onEdit: (u: ManagedUser) => void;
 }) {
   const { users, loading, busy } = props;
   const pending = users.filter((u) => u.status === "pending");
@@ -134,6 +143,15 @@ function UsersSection(props: {
                   size="sm"
                   variant="ghost"
                   disabled={busy}
+                  onClick={() => props.onEdit(u)}
+                  title="Redigera"
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={busy}
                   onClick={() => props.onToggleAdmin(u)}
                   title={u.is_admin ? "Ta bort admin" : "Gör till admin"}
                 >
@@ -170,6 +188,7 @@ function AdminPage() {
   const setAdmin = useServerFn(setUserAdmin);
   const deleteUser = useServerFn(deleteManagedUser);
   const createUser = useServerFn(createManagedUser);
+  const updateUser = useServerFn(updateManagedUser);
   const qc = useQueryClient();
 
   const today = new Date();
@@ -237,6 +256,30 @@ function AdminPage() {
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  const [editing, setEditing] = useState<ManagedUser | null>(null);
+  const [editEmail, setEditEmail] = useState("");
+  const [editPhone, setEditPhone] = useState("");
+  const [editPassword, setEditPassword] = useState("");
+
+  const updateMut = useMutation({
+    mutationFn: (v: { userId: string; email?: string; phone?: string; password?: string }) =>
+      updateUser({ data: v }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["managed-users"] });
+      qc.invalidateQueries({ queryKey: ["admin-entries"] });
+      toast.success("Användare uppdaterad");
+      setEditing(null);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  function openEdit(u: ManagedUser) {
+    setEditing(u);
+    setEditEmail(u.email ?? "");
+    setEditPhone(u.phone ?? "");
+    setEditPassword("");
+  }
 
   const entriesQ = useQuery({
     queryKey: ["admin-entries", from, to],
@@ -410,6 +453,7 @@ function AdminPage() {
               onReject={(u) => approvalMut.mutate({ userId: u.user_id, status: "rejected" })}
               onReset={(u) => approvalMut.mutate({ userId: u.user_id, status: "pending" })}
               onToggleAdmin={(u) => adminMut.mutate({ userId: u.user_id, isAdmin: !u.is_admin })}
+              onEdit={openEdit}
               onDelete={(u) => {
                 if (confirm(`Ta bort ${u.email ?? u.user_id}? Detta kan inte ångras.`)) {
                   deleteMut.mutate(u.user_id);
@@ -508,6 +552,68 @@ function AdminPage() {
           </>
         )}
       </main>
+
+      <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Redigera användare</DialogTitle>
+          </DialogHeader>
+          {editing && (
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <Label className="text-xs">E-post</Label>
+                <Input
+                  type="email"
+                  value={editEmail}
+                  onChange={(e) => setEditEmail(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Telefonnummer</Label>
+                <Input
+                  type="tel"
+                  value={editPhone}
+                  onChange={(e) => setEditPhone(e.target.value)}
+                  placeholder="+46 70 123 45 67"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Nytt lösenord (lämna tomt för oförändrat)</Label>
+                <Input
+                  type="text"
+                  value={editPassword}
+                  onChange={(e) => setEditPassword(e.target.value)}
+                  placeholder="Minst 6 tecken"
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setEditing(null)}>
+              Avbryt
+            </Button>
+            <Button
+              disabled={updateMut.isPending || !editing}
+              onClick={() => {
+                if (!editing) return;
+                const payload: { userId: string; email?: string; phone?: string; password?: string } = {
+                  userId: editing.user_id,
+                };
+                if (editEmail.trim() && editEmail.trim() !== (editing.email ?? "")) {
+                  payload.email = editEmail.trim();
+                }
+                if (editPhone.trim() !== (editing.phone ?? "")) {
+                  payload.phone = editPhone;
+                }
+                if (editPassword) payload.password = editPassword;
+                updateMut.mutate(payload);
+              }}
+            >
+              Spara
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
