@@ -660,6 +660,8 @@ function AdminPage() {
                 </table>
               </Card>
             </section>
+
+            <AuditLogSection entries={auditQ.data ?? []} loading={auditQ.isLoading} />
           </>
         )}
       </main>
