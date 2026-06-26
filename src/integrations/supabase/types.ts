@@ -14,9 +14,34 @@ export type Database = {
   }
   public: {
     Tables: {
+      clients: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          note: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          note?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          note?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       projects: {
         Row: {
           client: string | null
+          client_id: string | null
           color: string
           created_at: string
           id: string
@@ -25,6 +50,7 @@ export type Database = {
         }
         Insert: {
           client?: string | null
+          client_id?: string | null
           color?: string
           created_at?: string
           id?: string
@@ -33,13 +59,22 @@ export type Database = {
         }
         Update: {
           client?: string | null
+          client_id?: string | null
           color?: string
           created_at?: string
           id?: string
           name?: string
           user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "projects_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       time_entries: {
         Row: {

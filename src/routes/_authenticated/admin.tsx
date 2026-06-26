@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Download, ShieldCheck, Check, X, Trash2, Shield, ShieldOff, RotateCcw, UserPlus, Pencil, Plus, CalendarIcon, History } from "lucide-react";
+import { ArrowLeft, Download, ShieldCheck, Check, X, Trash2, Shield, ShieldOff, RotateCcw, UserPlus, Pencil, Plus, CalendarIcon, History, FolderKanban, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -467,6 +467,18 @@ function AdminPage() {
           </Card>
         ) : (
           <>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <Button asChild variant="outline">
+                <Link to="/admin-projects">
+                  <FolderKanban className="mr-2 h-4 w-4" /> Projekt & kunder
+                </Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link to="/admin-summary">
+                  <BarChart3 className="mr-2 h-4 w-4" /> Sammanställning
+                </Link>
+              </Button>
+            </div>
             <section className="space-y-2">
               <h2 className="px-1 text-sm font-medium text-muted-foreground">Skapa användare</h2>
               <Card className="space-y-3 p-4">

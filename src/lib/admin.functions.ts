@@ -521,3 +521,131 @@ export const getAuditLog = createServerFn({ method: "GET" })
       created_at: r.created_at,
     }));
   });
+
+export type SummaryFilters = {
+  from: string; // ISO date YYYY-MM-DD inclusive
+  to: string;   // ISO date YYYY-MM-DD inclusive
+  userId?: string | null;
+  clientId?: string | null;
+  projectId?: string | null;
+};
+
+export type SummaryRow = {
+  key: string;
+  label: string;
+  sublabel?: string | null;
+  color?: string | null;
+  ms: number;
+  count: number;
+};
+
+export type SummaryResult = {
+  totalMs: number;
+  totalCount: number;
+  perClient: SummaryRow[];
+  perProject: SummaryRow[];
+  perUser: SummaryRow[];
+};
+
+export const getSummary = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: SummaryFilters) => d)
+  .handler(async ({ data, context }): Promise<SummaryResult> => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const fromIso = new Date(`${data.from}T00:00:00`).toISOString();
+    const toIso = new Date(
+      new Date(`${data.to}T00:00:00`).getTime() + 24 * 3600 * 1000,
+    ).toISOString();
+
+    let q = supabaseAdmin
+      .from("time_entries")
+      .select("id, user_id, start_time, end_time, project_id, projects(id, name, color, client_id, client, clients(id, name))")
+      .gte("start_time", fromIso)
+      .lt("start_time", toIso)
+      .not("end_time", "is", null)
+      .limit(20000);
+    if (data.userId) q = q.eq("user_id", data.userId);
+    if (data.projectId) q = q.eq("project_id", data.projectId);
+
+    const { data: rows, error } = await q;
+    if (error) throw new Error(error.message);
+
+    // Filter by clientId in memory (joined column)
+    const filtered = (rows ?? []).filter((r: any) => {
+      if (!data.clientId) return true;
+      const cid = r.projects?.client_id ?? null;
+      return cid === data.clientId;
+    });
+
+    // Collect user ids and resolve emails
+    const userIds = new Set<string>(filtered.map((r: any) => r.user_id as string));
+    const emails = new Map<string, string | null>();
+    if (userIds.size > 0) {
+      let page = 1;
+      while (page < 20) {
+        const { data: usersPage, error: uErr } = await supabaseAdmin.auth.admin.listUsers({
+          page,
+          perPage: 1000,
+        });
+        if (uErr) throw new Error(uErr.message);
+        for (const u of usersPage.users) emails.set(u.id, u.email ?? null);
+        if (usersPage.users.length < 1000) break;
+        page += 1;
+      }
+    }
+
+    const perClient = new Map<string, SummaryRow>();
+    const perProject = new Map<string, SummaryRow>();
+    const perUser = new Map<string, SummaryRow>();
+    let totalMs = 0;
+    let totalCount = 0;
+
+    for (const r of filtered as any[]) {
+      const ms = new Date(r.end_time).getTime() - new Date(r.start_time).getTime();
+      if (ms <= 0) continue;
+      totalMs += ms;
+      totalCount += 1;
+
+      const proj = r.projects ?? null;
+      const clientObj = proj?.clients ?? null;
+      const clientKey = clientObj?.id ?? proj?.client ?? "__none__";
+      const clientLabel = clientObj?.name ?? proj?.client ?? "Ingen kund";
+      const pc = perClient.get(clientKey);
+      if (pc) { pc.ms += ms; pc.count += 1; }
+      else perClient.set(clientKey, { key: clientKey, label: clientLabel, ms, count: 1 });
+
+      const projKey = proj?.id ?? "__none__";
+      const projLabel = proj?.name ?? "Inget projekt";
+      const pp = perProject.get(projKey);
+      if (pp) { pp.ms += ms; pp.count += 1; }
+      else perProject.set(projKey, {
+        key: projKey,
+        label: projLabel,
+        sublabel: clientLabel,
+        color: proj?.color ?? null,
+        ms,
+        count: 1,
+      });
+
+      const uid = r.user_id as string;
+      const pu = perUser.get(uid);
+      if (pu) { pu.ms += ms; pu.count += 1; }
+      else perUser.set(uid, {
+        key: uid,
+        label: emails.get(uid) ?? uid,
+        ms,
+        count: 1,
+      });
+    }
+
+    const sortDesc = (a: SummaryRow, b: SummaryRow) => b.ms - a.ms;
+    return {
+      totalMs,
+      totalCount,
+      perClient: Array.from(perClient.values()).sort(sortDesc),
+      perProject: Array.from(perProject.values()).sort(sortDesc),
+      perUser: Array.from(perUser.values()).sort(sortDesc),
+    };
+  });
