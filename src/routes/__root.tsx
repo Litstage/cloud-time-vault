@@ -85,11 +85,15 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "apple-mobile-web-app-title", content: "Tidskoll" },
       { name: "mobile-web-app-capable", content: "yes" },
       { title: "Tidskoll – Tidsregistrering" },
-      { name: "description", content: "Registrera tid, projekt och OB-ersättning" },
-      { property: "og:title", content: "Tidskoll" },
-      { property: "og:description", content: "Registrera tid, projekt och OB-ersättning" },
+      { name: "description", content: "Registrera tid" },
+      { property: "og:title", content: "Tidskoll – Tidsregistrering" },
+      { property: "og:description", content: "Registrera tid" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
+      { name: "twitter:title", content: "Tidskoll – Tidsregistrering" },
+      { name: "twitter:description", content: "Registrera tid" },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/016a5ecf-8924-4d78-b64c-b1b783ef32d5/id-preview-e380c351--d7a0c5d7-420d-43fa-a56c-fc450fe485bc.lovable.app-1782475801798.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/016a5ecf-8924-4d78-b64c-b1b783ef32d5/id-preview-e380c351--d7a0c5d7-420d-43fa-a56c-fc450fe485bc.lovable.app-1782475801798.png" },
     ],
     links: [
       {
