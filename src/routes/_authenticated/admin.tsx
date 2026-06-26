@@ -199,6 +199,9 @@ function AdminPage() {
   const deleteUser = useServerFn(deleteManagedUser);
   const createUser = useServerFn(createManagedUser);
   const updateUser = useServerFn(updateManagedUser);
+  const createEntryFn = useServerFn(adminCreateTimeEntry);
+  const updateEntryFn = useServerFn(adminUpdateTimeEntry);
+  const deleteEntryFn = useServerFn(adminDeleteTimeEntry);
   const qc = useQueryClient();
 
   const today = new Date();
@@ -280,6 +283,60 @@ function AdminPage() {
       qc.invalidateQueries({ queryKey: ["admin-entries"] });
       toast.success("Användare uppdaterad");
       setEditing(null);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  type ProjectLite = { id: string; name: string; color: string };
+  const projectsQ = useQuery({
+    queryKey: ["projects"],
+    enabled: !!adminQ.data?.isAdmin,
+    queryFn: async (): Promise<ProjectLite[]> => {
+      const { data, error } = await supabase
+        .from("projects")
+        .select("id, name, color")
+        .order("name");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const [entryDialogOpen, setEntryDialogOpen] = useState(false);
+  const [editingEntry, setEditingEntry] = useState<AdminEntry | null>(null);
+
+  const createEntryMut = useMutation({
+    mutationFn: (v: {
+      userId: string; projectId: string | null; description: string | null;
+      date: string; start: string; end: string;
+    }) => createEntryFn({ data: v }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-entries"] });
+      toast.success("Tid tillagd");
+      setEntryDialogOpen(false);
+      setEditingEntry(null);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const updateEntryMut = useMutation({
+    mutationFn: (v: {
+      id: string; projectId: string | null; description: string | null;
+      date: string; start: string; end: string;
+    }) => updateEntryFn({ data: v }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-entries"] });
+      toast.success("Tid uppdaterad");
+      setEntryDialogOpen(false);
+      setEditingEntry(null);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const deleteEntryMut = useMutation({
+    mutationFn: (id: string) => deleteEntryFn({ data: { id } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-entries"] });
+      toast.success("Tid borttagen");
     },
     onError: (e: Error) => toast.error(e.message),
   });
