@@ -30,10 +30,12 @@ export type AuditLogEntry = {
   action: "create" | "update" | "delete";
   changed_by: string;
   changed_by_email: string | null;
-  before_data: Record<string, unknown> | null;
-  after_data: Record<string, unknown> | null;
+  before_data: Json | null;
+  after_data: Json | null;
   created_at: string;
 };
+
+type Json = string | number | boolean | null | { [k: string]: Json } | Json[];
 
 async function assertAdmin(context: { supabase: any; userId: string }) {
   const { data, error } = await context.supabase.rpc("has_role", {
