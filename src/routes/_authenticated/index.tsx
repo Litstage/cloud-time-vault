@@ -1,11 +1,15 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -15,9 +19,10 @@ import {
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Play, Square, Plus, Download, LogOut, FolderKanban, Trash2, MoreVertical, BarChart3, ShieldCheck } from "lucide-react";
+import { Play, Square, Plus, Download, LogOut, FolderKanban, Trash2, MoreVertical, BarChart3, ShieldCheck, CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { ApprovalGate } from "@/components/approval-gate";
+import { isAdmin as isAdminFn } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/_authenticated/")({
   head: () => ({ meta: [{ title: "Tidskoll – Tidsregistrering" }] }),
@@ -54,6 +59,19 @@ function HomePage() {
   const [projectId, setProjectId] = useState<string>("none");
   const [manualOpen, setManualOpen] = useState(false);
   const [projectsOpen, setProjectsOpen] = useState(false);
+  const [filterDate, setFilterDate] = useState<Date>(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  });
+
+  const checkAdmin = useServerFn(isAdminFn);
+  const adminQ = useQuery({
+    queryKey: ["is-admin"],
+    queryFn: () => checkAdmin({ data: undefined }),
+    staleTime: 60_000,
+  });
+  const userIsAdmin = Boolean(adminQ.data?.isAdmin);
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -152,14 +170,20 @@ function HomePage() {
 
   const grouped = useMemo(() => {
     const map = new Map<string, Entry[]>();
+    const day0 = new Date(filterDate);
+    day0.setHours(0, 0, 0, 0);
+    const day1 = new Date(day0);
+    day1.setDate(day1.getDate() + 1);
     for (const e of entriesQ.data ?? []) {
       if (!e.end_time) continue;
+      const t = new Date(e.start_time).getTime();
+      if (t < day0.getTime() || t >= day1.getTime()) continue;
       const day = new Date(e.start_time).toLocaleDateString("sv-SE", { weekday: "long", day: "numeric", month: "long" });
       if (!map.has(day)) map.set(day, []);
       map.get(day)!.push(e);
     }
     return Array.from(map.entries());
-  }, [entriesQ.data]);
+  }, [entriesQ.data, filterDate]);
 
   const totals = useMemo(() => {
     const totals = new Map<string, number>();
@@ -254,12 +278,55 @@ function HomePage() {
 
         {/* Entries */}
         <section className="space-y-4">
-          <h2 className="text-sm font-medium text-muted-foreground">Senaste poster</h2>
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-sm font-medium text-muted-foreground">Poster för dagen</h2>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => {
+                  const d = new Date(filterDate);
+                  d.setDate(d.getDate() - 1);
+                  setFilterDate(d);
+                }}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="font-normal">
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {filterDate.toLocaleDateString("sv-SE", { weekday: "short", day: "numeric", month: "short" })}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="end">
+                  <Calendar
+                    mode="single"
+                    selected={filterDate}
+                    onSelect={(d) => d && setFilterDate(d)}
+                    initialFocus
+                    className={cn("p-3 pointer-events-auto")}
+                  />
+                </PopoverContent>
+              </Popover>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => {
+                  const d = new Date(filterDate);
+                  d.setDate(d.getDate() + 1);
+                  setFilterDate(d);
+                }}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
           {entriesQ.isLoading ? (
             <Card className="p-8 text-center text-sm text-muted-foreground">Laddar…</Card>
           ) : grouped.length === 0 ? (
             <Card className="p-8 text-center text-sm text-muted-foreground">
-              Inga tidsposter ännu. Starta timern eller lägg till manuellt.
+              Inga tidsposter denna dag.
             </Card>
           ) : (
             grouped.map(([day, list]) => (
@@ -297,15 +364,18 @@ function HomePage() {
       </main>
 
       <ManualEntryDialog open={manualOpen} onOpenChange={setManualOpen} projects={projectsQ.data ?? []} />
-      <ProjectsDialog open={projectsOpen} onOpenChange={setProjectsOpen} projects={projectsQ.data ?? []} />
+      <ProjectsDialog open={projectsOpen} onOpenChange={setProjectsOpen} projects={projectsQ.data ?? []} isAdmin={userIsAdmin} />
     </div>
   );
 }
 
 function ManualEntryDialog({ open, onOpenChange, projects }: { open: boolean; onOpenChange: (v: boolean) => void; projects: Project[] }) {
   const qc = useQueryClient();
-  const today = new Date().toISOString().slice(0, 10);
-  const [date, setDate] = useState(today);
+  const [date, setDate] = useState<Date>(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  });
   const [start, setStart] = useState("09:00");
   const [end, setEnd] = useState("10:00");
   const [description, setDescription] = useState("");
@@ -314,8 +384,9 @@ function ManualEntryDialog({ open, onOpenChange, projects }: { open: boolean; on
   async function save() {
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) return;
-    const startIso = new Date(`${date}T${start}`).toISOString();
-    const endIso = new Date(`${date}T${end}`).toISOString();
+    const isoDay = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    const startIso = new Date(`${isoDay}T${start}`).toISOString();
+    const endIso = new Date(`${isoDay}T${end}`).toISOString();
     if (new Date(endIso) <= new Date(startIso)) return toast.error("Sluttid måste vara efter starttid");
     const { error } = await supabase.from("time_entries").insert({
       user_id: u.user.id,
@@ -338,7 +409,23 @@ function ManualEntryDialog({ open, onOpenChange, projects }: { open: boolean; on
         <div className="space-y-4">
           <div className="space-y-2">
             <Label>Datum</Label>
-            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className={cn("w-full justify-start text-left font-normal")}>
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {date.toLocaleDateString("sv-SE", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={date}
+                  onSelect={(d) => d && setDate(d)}
+                  initialFocus
+                  className={cn("p-3 pointer-events-auto")}
+                />
+              </PopoverContent>
+            </Popover>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
@@ -380,7 +467,7 @@ function ManualEntryDialog({ open, onOpenChange, projects }: { open: boolean; on
 
 const COLORS = ["#ef4444", "#f97316", "#eab308", "#22c55e", "#06b6d4", "#6366f1", "#ec4899", "#8b5cf6"];
 
-function ProjectsDialog({ open, onOpenChange, projects }: { open: boolean; onOpenChange: (v: boolean) => void; projects: Project[] }) {
+function ProjectsDialog({ open, onOpenChange, projects, isAdmin }: { open: boolean; onOpenChange: (v: boolean) => void; projects: Project[]; isAdmin: boolean }) {
   const qc = useQueryClient();
   const [name, setName] = useState("");
   const [client, setClient] = useState("");
@@ -413,23 +500,29 @@ function ProjectsDialog({ open, onOpenChange, projects }: { open: boolean; onOpe
       <DialogContent>
         <DialogHeader><DialogTitle>Projekt & kunder</DialogTitle></DialogHeader>
         <div className="space-y-4">
-          <div className="space-y-2">
-            <Input placeholder="Projektnamn" value={name} onChange={(e) => setName(e.target.value)} />
-            <Input placeholder="Kund (valfritt)" value={client} onChange={(e) => setClient(e.target.value)} />
-            <div className="flex flex-wrap gap-2">
-              {COLORS.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => setColor(c)}
-                  className={`h-7 w-7 rounded-full ring-offset-2 transition ${color === c ? "ring-2 ring-foreground" : ""}`}
-                  style={{ background: c }}
-                  aria-label={c}
-                />
-              ))}
+          {isAdmin ? (
+            <div className="space-y-2">
+              <Input placeholder="Projektnamn" value={name} onChange={(e) => setName(e.target.value)} />
+              <Input placeholder="Kund (valfritt)" value={client} onChange={(e) => setClient(e.target.value)} />
+              <div className="flex flex-wrap gap-2">
+                {COLORS.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setColor(c)}
+                    className={`h-7 w-7 rounded-full ring-offset-2 transition ${color === c ? "ring-2 ring-foreground" : ""}`}
+                    style={{ background: c }}
+                    aria-label={c}
+                  />
+                ))}
+              </div>
+              <Button onClick={add} className="w-full"><Plus className="mr-2 h-4 w-4" /> Lägg till projekt</Button>
             </div>
-            <Button onClick={add} className="w-full"><Plus className="mr-2 h-4 w-4" /> Lägg till projekt</Button>
-          </div>
+          ) : (
+            <p className="rounded-md bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+              Endast administratörer kan skapa eller ta bort projekt.
+            </p>
+          )}
           <div className="space-y-1">
             {projects.length === 0 ? (
               <p className="text-sm text-muted-foreground">Inga projekt ännu.</p>
@@ -440,9 +533,11 @@ function ProjectsDialog({ open, onOpenChange, projects }: { open: boolean; onOpe
                   <div className="text-sm font-medium">{p.name}</div>
                   {p.client && <div className="text-xs text-muted-foreground">{p.client}</div>}
                 </div>
-                <Button variant="ghost" size="icon" onClick={() => remove(p.id)}>
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                {isAdmin && (
+                  <Button variant="ghost" size="icon" onClick={() => remove(p.id)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
             ))}
           </div>
