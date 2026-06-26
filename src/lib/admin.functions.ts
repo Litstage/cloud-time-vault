@@ -324,3 +324,84 @@ export const getAllTimeEntries = createServerFn({ method: "GET" })
       };
     });
   });
+
+function computeIsoTimes(dateIso: string, startHHMM: string, endHHMM: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateIso)) throw new Error("Ogiltigt datum");
+  if (!/^\d{2}:\d{2}$/.test(startHHMM) || !/^\d{2}:\d{2}$/.test(endHHMM))
+    throw new Error("Ogiltig tid");
+  const startDate = new Date(`${dateIso}T${startHHMM}:00`);
+  let endDate = new Date(`${dateIso}T${endHHMM}:00`);
+  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime()))
+    throw new Error("Ogiltigt datum/tid");
+  if (endDate.getTime() <= startDate.getTime()) {
+    endDate = new Date(endDate.getTime() + 24 * 3600 * 1000);
+  }
+  return { start: startDate.toISOString(), end: endDate.toISOString() };
+}
+
+export const adminCreateTimeEntry = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    (d: {
+      userId: string;
+      projectId: string | null;
+      description: string | null;
+      date: string;
+      start: string;
+      end: string;
+    }) => d,
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { start, end } = computeIsoTimes(data.date, data.start, data.end);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.from("time_entries").insert({
+      user_id: data.userId,
+      project_id: data.projectId,
+      description: data.description,
+      start_time: start,
+      end_time: end,
+    });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const adminUpdateTimeEntry = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    (d: {
+      id: string;
+      projectId: string | null;
+      description: string | null;
+      date: string;
+      start: string;
+      end: string;
+    }) => d,
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { start, end } = computeIsoTimes(data.date, data.start, data.end);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
+      .from("time_entries")
+      .update({
+        project_id: data.projectId,
+        description: data.description,
+        start_time: start,
+        end_time: end,
+      })
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const adminDeleteTimeEntry = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string }) => d)
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.from("time_entries").delete().eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
