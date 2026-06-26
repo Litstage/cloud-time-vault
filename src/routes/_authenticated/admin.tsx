@@ -29,6 +29,136 @@ function formatHours(ms: number) {
   return (ms / 3600000).toFixed(2);
 }
 
+function StatusBadge({ status }: { status: ManagedUser["status"] }) {
+  const styles: Record<ManagedUser["status"], string> = {
+    pending: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+    approved: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+    rejected: "bg-destructive/15 text-destructive",
+  };
+  const labels: Record<ManagedUser["status"], string> = {
+    pending: "Väntar",
+    approved: "Godkänd",
+    rejected: "Nekad",
+  };
+  return (
+    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${styles[status]}`}>
+      {labels[status]}
+    </span>
+  );
+}
+
+function UsersSection(props: {
+  users: ManagedUser[];
+  loading: boolean;
+  busy: boolean;
+  onApprove: (u: ManagedUser) => void;
+  onReject: (u: ManagedUser) => void;
+  onReset: (u: ManagedUser) => void;
+  onToggleAdmin: (u: ManagedUser) => void;
+  onDelete: (u: ManagedUser) => void;
+}) {
+  const { users, loading, busy } = props;
+  const pending = users.filter((u) => u.status === "pending");
+  return (
+    <section className="space-y-2">
+      <div className="flex items-center justify-between px-1">
+        <h2 className="text-sm font-medium text-muted-foreground">
+          Användare ({users.length})
+        </h2>
+        {pending.length > 0 && (
+          <span className="text-xs font-medium text-amber-600 dark:text-amber-400">
+            {pending.length} väntar på godkännande
+          </span>
+        )}
+      </div>
+      <Card className="divide-y p-0">
+        {loading ? (
+          <div className="p-6 text-center text-sm text-muted-foreground">Laddar…</div>
+        ) : users.length === 0 ? (
+          <div className="p-6 text-center text-sm text-muted-foreground">Inga användare.</div>
+        ) : (
+          users.map((u) => (
+            <div
+              key={u.user_id}
+              className="flex flex-wrap items-center gap-3 px-4 py-3"
+            >
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="truncate text-sm font-medium">{u.email ?? u.user_id}</span>
+                  {u.is_admin && (
+                    <span className="rounded-full bg-primary/15 px-2 py-0.5 text-xs font-medium text-primary">
+                      Admin
+                    </span>
+                  )}
+                  <StatusBadge status={u.status} />
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Skapad {new Date(u.created_at).toLocaleDateString("sv-SE")}
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-1">
+                {u.status !== "approved" && (
+                  <Button
+                    size="sm"
+                    variant="default"
+                    disabled={busy}
+                    onClick={() => props.onApprove(u)}
+                  >
+                    <Check className="mr-1 h-4 w-4" /> Godkänn
+                  </Button>
+                )}
+                {u.status !== "rejected" && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={busy}
+                    onClick={() => props.onReject(u)}
+                  >
+                    <X className="mr-1 h-4 w-4" /> Neka
+                  </Button>
+                )}
+                {u.status !== "pending" && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={busy}
+                    onClick={() => props.onReset(u)}
+                    title="Återställ till väntande"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={busy}
+                  onClick={() => props.onToggleAdmin(u)}
+                  title={u.is_admin ? "Ta bort admin" : "Gör till admin"}
+                >
+                  {u.is_admin ? (
+                    <ShieldOff className="h-4 w-4" />
+                  ) : (
+                    <Shield className="h-4 w-4" />
+                  )}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={busy}
+                  onClick={() => props.onDelete(u)}
+                  className="text-destructive hover:text-destructive"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          ))
+        )}
+      </Card>
+    </section>
+  );
+}
+
 function AdminPage() {
   const checkAdmin = useServerFn(isAdmin);
   const claim = useServerFn(claimFirstAdmin);
