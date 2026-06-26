@@ -87,7 +87,7 @@ function AdminSummaryPage() {
     if (!summaryQ.data) return;
     const esc = (v: string) => `"${v.replace(/"/g, '""')}"`;
     const lines: string[] = [];
-    lines.push("Sektion,Etikett,Underetikett,Normal h,OB1 h,OB2 h,OB3 h,Totalt h,Belopp kr,Antal poster");
+    lines.push("Sektion,Etikett,Underetikett,Normal h,OB1 h,OB2 h,OB3 h,Totalt h,Lön kr,Debitering kr,Antal poster");
     const dump = (section: string, rows: SummaryRow[]) => {
       for (const r of rows) {
         lines.push([
@@ -100,6 +100,7 @@ function AdminSummaryPage() {
           fmtHours(r.ob3Ms ?? 0),
           fmtHours(r.ms),
           (r.amount ?? 0).toFixed(2),
+          (r.billing ?? 0).toFixed(2),
           String(r.count),
         ].join(","));
       }
@@ -200,18 +201,19 @@ function AdminSummaryPage() {
                 </Button>
               </div>
               {s && (
-                <div className="grid grid-cols-2 gap-2 rounded-md bg-muted/40 p-3 text-xs sm:grid-cols-5">
+                <div className="grid grid-cols-2 gap-2 rounded-md bg-muted/40 p-3 text-xs sm:grid-cols-6">
                   <Stat label="Normal" value={`${fmtHours(s.totalNormalMs)} h`} />
                   <Stat label="OB1" value={`${fmtHours(s.totalOb1Ms)} h`} />
                   <Stat label="OB2" value={`${fmtHours(s.totalOb2Ms)} h`} />
                   <Stat label="OB3" value={`${fmtHours(s.totalOb3Ms)} h`} />
-                  <Stat label="Belopp" value={`${fmtKr(s.totalAmount)} kr`} />
+                  <Stat label="Lön" value={`${fmtKr(s.totalAmount)} kr`} />
+                  <Stat label="Debitering" value={`${fmtKr(s.totalBilling)} kr`} />
                 </div>
               )}
             </Card>
 
-            <SummarySection title="Per kund" rows={summaryQ.data?.perClient ?? []} loading={summaryQ.isLoading} totalMs={totalMs} />
-            <SummarySection title="Per projekt" rows={summaryQ.data?.perProject ?? []} loading={summaryQ.isLoading} totalMs={totalMs} showSwatch />
+            <SummarySection title="Per kund" rows={summaryQ.data?.perClient ?? []} loading={summaryQ.isLoading} totalMs={totalMs} showBilling />
+            <SummarySection title="Per projekt" rows={summaryQ.data?.perProject ?? []} loading={summaryQ.isLoading} totalMs={totalMs} showSwatch showBilling />
             <SummarySection title="Per användare" rows={summaryQ.data?.perUser ?? []} loading={summaryQ.isLoading} totalMs={totalMs} showAmount />
           </>
         )}
@@ -229,8 +231,8 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function SummarySection({ title, rows, loading, totalMs, showSwatch, showAmount }: {
-  title: string; rows: SummaryRow[]; loading: boolean; totalMs: number; showSwatch?: boolean; showAmount?: boolean;
+function SummarySection({ title, rows, loading, totalMs, showSwatch, showAmount, showBilling }: {
+  title: string; rows: SummaryRow[]; loading: boolean; totalMs: number; showSwatch?: boolean; showAmount?: boolean; showBilling?: boolean;
 }) {
   return (
     <section className="space-y-2">
@@ -257,7 +259,10 @@ function SummarySection({ title, rows, loading, totalMs, showSwatch, showAmount 
                     <div className="font-mono text-sm font-semibold tabular-nums">{fmtHours(r.ms)} h</div>
                     <div className="text-xs text-muted-foreground">{pct.toFixed(1)}% · {r.count} poster</div>
                     {showAmount && r.amount !== undefined && (
-                      <div className="text-xs font-medium text-foreground">{fmtKr(r.amount)} kr</div>
+                      <div className="text-xs font-medium text-foreground">Lön: {fmtKr(r.amount)} kr</div>
+                    )}
+                    {showBilling && r.billing !== undefined && r.billing > 0 && (
+                      <div className="text-xs font-medium text-foreground">Debitering: {fmtKr(r.billing)} kr</div>
                     )}
                   </div>
                 </div>
