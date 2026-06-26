@@ -296,17 +296,17 @@ function AdminPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  type ProjectLite = { id: string; name: string; color: string };
+  type ProjectLite = { id: string; name: string; color: string; start_date: string | null; end_date: string | null };
   const projectsQ = useQuery({
     queryKey: ["projects"],
     enabled: !!adminQ.data?.isAdmin,
     queryFn: async (): Promise<ProjectLite[]> => {
       const { data, error } = await supabase
         .from("projects")
-        .select("id, name, color")
+        .select("id, name, color, start_date, end_date")
         .order("name");
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []) as unknown as ProjectLite[];
     },
   });
 
