@@ -15,6 +15,7 @@ import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedOverviewRouteImport } from './routes/_authenticated/overview'
 import { Route as AuthenticatedAdminSummaryRouteImport } from './routes/_authenticated/admin-summary'
 import { Route as AuthenticatedAdminProjectsRouteImport } from './routes/_authenticated/admin-projects'
+import { Route as AuthenticatedAdminObRouteImport } from './routes/_authenticated/admin-ob'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 
 const AuthRoute = AuthRouteImport.update({
@@ -48,6 +49,11 @@ const AuthenticatedAdminProjectsRoute =
     path: '/admin-projects',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedAdminObRoute = AuthenticatedAdminObRouteImport.update({
+  id: '/admin-ob',
+  path: '/admin-ob',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   id: '/admin',
   path: '/admin',
@@ -58,6 +64,7 @@ export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
   '/auth': typeof AuthRoute
   '/admin': typeof AuthenticatedAdminRoute
+  '/admin-ob': typeof AuthenticatedAdminObRoute
   '/admin-projects': typeof AuthenticatedAdminProjectsRoute
   '/admin-summary': typeof AuthenticatedAdminSummaryRoute
   '/overview': typeof AuthenticatedOverviewRoute
@@ -65,6 +72,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/admin': typeof AuthenticatedAdminRoute
+  '/admin-ob': typeof AuthenticatedAdminObRoute
   '/admin-projects': typeof AuthenticatedAdminProjectsRoute
   '/admin-summary': typeof AuthenticatedAdminSummaryRoute
   '/overview': typeof AuthenticatedOverviewRoute
@@ -75,6 +83,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
+  '/_authenticated/admin-ob': typeof AuthenticatedAdminObRoute
   '/_authenticated/admin-projects': typeof AuthenticatedAdminProjectsRoute
   '/_authenticated/admin-summary': typeof AuthenticatedAdminSummaryRoute
   '/_authenticated/overview': typeof AuthenticatedOverviewRoute
@@ -86,6 +95,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/admin'
+    | '/admin-ob'
     | '/admin-projects'
     | '/admin-summary'
     | '/overview'
@@ -93,6 +103,7 @@ export interface FileRouteTypes {
   to:
     | '/auth'
     | '/admin'
+    | '/admin-ob'
     | '/admin-projects'
     | '/admin-summary'
     | '/overview'
@@ -102,6 +113,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/auth'
     | '/_authenticated/admin'
+    | '/_authenticated/admin-ob'
     | '/_authenticated/admin-projects'
     | '/_authenticated/admin-summary'
     | '/_authenticated/overview'
@@ -157,6 +169,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminProjectsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/admin-ob': {
+      id: '/_authenticated/admin-ob'
+      path: '/admin-ob'
+      fullPath: '/admin-ob'
+      preLoaderRoute: typeof AuthenticatedAdminObRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/admin': {
       id: '/_authenticated/admin'
       path: '/admin'
@@ -169,6 +188,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
+  AuthenticatedAdminObRoute: typeof AuthenticatedAdminObRoute
   AuthenticatedAdminProjectsRoute: typeof AuthenticatedAdminProjectsRoute
   AuthenticatedAdminSummaryRoute: typeof AuthenticatedAdminSummaryRoute
   AuthenticatedOverviewRoute: typeof AuthenticatedOverviewRoute
@@ -177,6 +197,7 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRoute,
+  AuthenticatedAdminObRoute: AuthenticatedAdminObRoute,
   AuthenticatedAdminProjectsRoute: AuthenticatedAdminProjectsRoute,
   AuthenticatedAdminSummaryRoute: AuthenticatedAdminSummaryRoute,
   AuthenticatedOverviewRoute: AuthenticatedOverviewRoute,

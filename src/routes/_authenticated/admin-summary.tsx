@@ -19,6 +19,7 @@ export const Route = createFileRoute("/_authenticated/admin-summary")({
 });
 
 function fmtHours(ms: number) { return (ms / 3600000).toFixed(2); }
+function fmtKr(n: number) { return n.toLocaleString("sv-SE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
 function AdminSummaryPage() {
   const checkAdmin = useServerFn(isAdmin);
@@ -86,14 +87,19 @@ function AdminSummaryPage() {
     if (!summaryQ.data) return;
     const esc = (v: string) => `"${v.replace(/"/g, '""')}"`;
     const lines: string[] = [];
-    lines.push("Sektion,Etikett,Underetikett,Timmar,Antal poster");
+    lines.push("Sektion,Etikett,Underetikett,Normal h,OB1 h,OB2 h,OB3 h,Totalt h,Belopp kr,Antal poster");
     const dump = (section: string, rows: SummaryRow[]) => {
       for (const r of rows) {
         lines.push([
           esc(section),
           esc(r.label),
           esc(r.sublabel ?? ""),
+          fmtHours(r.normalMs ?? 0),
+          fmtHours(r.ob1Ms ?? 0),
+          fmtHours(r.ob2Ms ?? 0),
+          fmtHours(r.ob3Ms ?? 0),
           fmtHours(r.ms),
+          (r.amount ?? 0).toFixed(2),
           String(r.count),
         ].join(","));
       }
@@ -111,6 +117,7 @@ function AdminSummaryPage() {
   }
 
   const totalMs = summaryQ.data?.totalMs ?? 0;
+  const s = summaryQ.data;
 
   return (
     <div className="min-h-screen bg-background pb-12">
@@ -184,19 +191,28 @@ function AdminSummaryPage() {
                 <div className="text-sm">
                   Total tid:{" "}
                   <span className="font-mono font-semibold tabular-nums">{fmtHours(totalMs)} h</span>
-                  {summaryQ.data && (
-                    <span className="text-muted-foreground"> · {summaryQ.data.totalCount} poster</span>
+                  {s && (
+                    <span className="text-muted-foreground"> · {s.totalCount} poster</span>
                   )}
                 </div>
                 <Button onClick={exportCsv} variant="outline" size="sm" disabled={!summaryQ.data}>
                   <Download className="mr-2 h-4 w-4" /> CSV
                 </Button>
               </div>
+              {s && (
+                <div className="grid grid-cols-2 gap-2 rounded-md bg-muted/40 p-3 text-xs sm:grid-cols-5">
+                  <Stat label="Normal" value={`${fmtHours(s.totalNormalMs)} h`} />
+                  <Stat label="OB1" value={`${fmtHours(s.totalOb1Ms)} h`} />
+                  <Stat label="OB2" value={`${fmtHours(s.totalOb2Ms)} h`} />
+                  <Stat label="OB3" value={`${fmtHours(s.totalOb3Ms)} h`} />
+                  <Stat label="Belopp" value={`${fmtKr(s.totalAmount)} kr`} />
+                </div>
+              )}
             </Card>
 
             <SummarySection title="Per kund" rows={summaryQ.data?.perClient ?? []} loading={summaryQ.isLoading} totalMs={totalMs} />
             <SummarySection title="Per projekt" rows={summaryQ.data?.perProject ?? []} loading={summaryQ.isLoading} totalMs={totalMs} showSwatch />
-            <SummarySection title="Per användare" rows={summaryQ.data?.perUser ?? []} loading={summaryQ.isLoading} totalMs={totalMs} />
+            <SummarySection title="Per användare" rows={summaryQ.data?.perUser ?? []} loading={summaryQ.isLoading} totalMs={totalMs} showAmount />
           </>
         )}
       </main>
@@ -204,8 +220,17 @@ function AdminSummaryPage() {
   );
 }
 
-function SummarySection({ title, rows, loading, totalMs, showSwatch }: {
-  title: string; rows: SummaryRow[]; loading: boolean; totalMs: number; showSwatch?: boolean;
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="text-center">
+      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className="font-mono text-sm font-semibold tabular-nums">{value}</div>
+    </div>
+  );
+}
+
+function SummarySection({ title, rows, loading, totalMs, showSwatch, showAmount }: {
+  title: string; rows: SummaryRow[]; loading: boolean; totalMs: number; showSwatch?: boolean; showAmount?: boolean;
 }) {
   return (
     <section className="space-y-2">
@@ -231,7 +256,16 @@ function SummarySection({ title, rows, loading, totalMs, showSwatch }: {
                   <div className="text-right">
                     <div className="font-mono text-sm font-semibold tabular-nums">{fmtHours(r.ms)} h</div>
                     <div className="text-xs text-muted-foreground">{pct.toFixed(1)}% · {r.count} poster</div>
+                    {showAmount && r.amount !== undefined && (
+                      <div className="text-xs font-medium text-foreground">{fmtKr(r.amount)} kr</div>
+                    )}
                   </div>
+                </div>
+                <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                  <span>Normal {fmtHours(r.normalMs ?? 0)} h</span>
+                  <span>OB1 {fmtHours(r.ob1Ms ?? 0)} h</span>
+                  <span>OB2 {fmtHours(r.ob2Ms ?? 0)} h</span>
+                  <span>OB3 {fmtHours(r.ob3Ms ?? 0)} h</span>
                 </div>
                 <div className="h-1.5 overflow-hidden rounded-full bg-muted">
                   <div className="h-full rounded-full bg-primary" style={{ width: `${pct}%` }} />

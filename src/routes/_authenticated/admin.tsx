@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Download, ShieldCheck, Check, X, Trash2, Shield, ShieldOff, RotateCcw, UserPlus, Pencil, Plus, CalendarIcon, History, FolderKanban, BarChart3 } from "lucide-react";
+import { ArrowLeft, Download, ShieldCheck, Check, X, Trash2, Shield, ShieldOff, RotateCcw, UserPlus, Pencil, Plus, CalendarIcon, History, FolderKanban, BarChart3, Clock } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -32,6 +32,8 @@ import {
   deleteManagedUser,
   createManagedUser,
   updateManagedUser,
+  getUserWage,
+  upsertUserWage,
   adminCreateTimeEntry,
   adminUpdateTimeEntry,
   adminDeleteTimeEntry,
@@ -201,6 +203,8 @@ function AdminPage() {
   const deleteUser = useServerFn(deleteManagedUser);
   const createUser = useServerFn(createManagedUser);
   const updateUser = useServerFn(updateManagedUser);
+  const fetchWage = useServerFn(getUserWage);
+  const saveWage = useServerFn(upsertUserWage);
   const createEntryFn = useServerFn(adminCreateTimeEntry);
   const updateEntryFn = useServerFn(adminUpdateTimeEntry);
   const deleteEntryFn = useServerFn(adminDeleteTimeEntry);
@@ -283,6 +287,10 @@ function AdminPage() {
   const [editEmail, setEditEmail] = useState("");
   const [editPhone, setEditPhone] = useState("");
   const [editPassword, setEditPassword] = useState("");
+  const [editHourly, setEditHourly] = useState("0");
+  const [editOb1, setEditOb1] = useState("0");
+  const [editOb2, setEditOb2] = useState("0");
+  const [editOb3, setEditOb3] = useState("0");
 
   const updateMut = useMutation({
     mutationFn: (v: { userId: string; email?: string; phone?: string; password?: string }) =>
@@ -293,6 +301,13 @@ function AdminPage() {
       toast.success("Användare uppdaterad");
       setEditing(null);
     },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const wageMut = useMutation({
+    mutationFn: (v: { user_id: string; hourly_rate: number; ob1_pct: number; ob2_pct: number; ob3_pct: number }) =>
+      saveWage({ data: v }),
+    onSuccess: () => toast.success("Löneuppgifter sparade"),
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -358,6 +373,15 @@ function AdminPage() {
     setEditEmail(u.email ?? "");
     setEditPhone(u.phone ?? "");
     setEditPassword("");
+    setEditHourly("0"); setEditOb1("0"); setEditOb2("0"); setEditOb3("0");
+    fetchWage({ data: { userId: u.user_id } })
+      .then((w) => {
+        setEditHourly(String(w.hourly_rate));
+        setEditOb1(String(w.ob1_pct));
+        setEditOb2(String(w.ob2_pct));
+        setEditOb3(String(w.ob3_pct));
+      })
+      .catch(() => {});
   }
 
   const entriesQ = useQuery({
@@ -467,7 +491,7 @@ function AdminPage() {
           </Card>
         ) : (
           <>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
               <Button asChild variant="outline">
                 <Link to="/admin-projects">
                   <FolderKanban className="mr-2 h-4 w-4" /> Projekt & kunder
@@ -476,6 +500,11 @@ function AdminPage() {
               <Button asChild variant="outline">
                 <Link to="/admin-summary">
                   <BarChart3 className="mr-2 h-4 w-4" /> Sammanställning
+                </Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link to="/admin-ob">
+                  <Clock className="mr-2 h-4 w-4" /> OB-regler
                 </Link>
               </Button>
             </div>
@@ -722,6 +751,27 @@ function AdminPage() {
                   placeholder="Minst 6 tecken"
                 />
               </div>
+              <div className="rounded-md border p-3">
+                <div className="mb-2 text-xs font-medium uppercase text-muted-foreground">Lön & OB</div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Timlön (kr)</Label>
+                    <Input type="number" step="0.01" value={editHourly} onChange={(e) => setEditHourly(e.target.value)} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">OB1 (% påslag)</Label>
+                    <Input type="number" step="0.01" value={editOb1} onChange={(e) => setEditOb1(e.target.value)} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">OB2 (% påslag)</Label>
+                    <Input type="number" step="0.01" value={editOb2} onChange={(e) => setEditOb2(e.target.value)} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">OB3 (% påslag)</Label>
+                    <Input type="number" step="0.01" value={editOb3} onChange={(e) => setEditOb3(e.target.value)} />
+                  </div>
+                </div>
+              </div>
             </div>
           )}
           <DialogFooter>
@@ -742,6 +792,14 @@ function AdminPage() {
                   payload.phone = editPhone;
                 }
                 if (editPassword) payload.password = editPassword;
+                // Save wage in parallel (always — admin may have changed only wages)
+                wageMut.mutate({
+                  user_id: editing.user_id,
+                  hourly_rate: Number(editHourly) || 0,
+                  ob1_pct: Number(editOb1) || 0,
+                  ob2_pct: Number(editOb2) || 0,
+                  ob3_pct: Number(editOb3) || 0,
+                });
                 updateMut.mutate(payload);
               }}
             >

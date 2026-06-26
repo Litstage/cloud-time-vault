@@ -38,6 +38,42 @@ export type Database = {
         }
         Relationships: []
       }
+      ob_rules: {
+        Row: {
+          active: boolean
+          created_at: string
+          end_time: string
+          id: string
+          level: number
+          name: string
+          start_time: string
+          updated_at: string
+          weekday: number
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          end_time: string
+          id?: string
+          level: number
+          name: string
+          start_time: string
+          updated_at?: string
+          weekday: number
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          end_time?: string
+          id?: string
+          level?: number
+          name?: string
+          start_time?: string
+          updated_at?: string
+          weekday?: number
+        }
+        Relationships: []
+      }
       projects: {
         Row: {
           client: string | null
@@ -197,6 +233,36 @@ export type Database = {
           created_at?: string
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_wages: {
+        Row: {
+          created_at: string
+          hourly_rate: number
+          ob1_pct: number
+          ob2_pct: number
+          ob3_pct: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          hourly_rate?: number
+          ob1_pct?: number
+          ob2_pct?: number
+          ob3_pct?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          hourly_rate?: number
+          ob1_pct?: number
+          ob2_pct?: number
+          ob3_pct?: number
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
