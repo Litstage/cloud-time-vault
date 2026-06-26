@@ -754,7 +754,13 @@ function AdminPage() {
   );
 }
 
-type ProjectLite = { id: string; name: string; color: string };
+type ProjectLite = { id: string; name: string; color: string; start_date: string | null; end_date: string | null };
+
+function isProjectActiveYmd(p: { start_date: string | null; end_date: string | null }, ymd: string): boolean {
+  if (p.start_date && p.start_date > ymd) return false;
+  if (p.end_date && p.end_date < ymd) return false;
+  return true;
+}
 type EntryFormBase = {
   projectId: string | null;
   description: string | null;
