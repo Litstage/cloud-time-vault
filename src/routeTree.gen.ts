@@ -13,6 +13,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedOverviewRouteImport } from './routes/_authenticated/overview'
+import { Route as AuthenticatedAdminSummaryRouteImport } from './routes/_authenticated/admin-summary'
 import { Route as AuthenticatedAdminProjectsRouteImport } from './routes/_authenticated/admin-projects'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 
@@ -35,6 +36,12 @@ const AuthenticatedOverviewRoute = AuthenticatedOverviewRouteImport.update({
   path: '/overview',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedAdminSummaryRoute =
+  AuthenticatedAdminSummaryRouteImport.update({
+    id: '/admin-summary',
+    path: '/admin-summary',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedAdminProjectsRoute =
   AuthenticatedAdminProjectsRouteImport.update({
     id: '/admin-projects',
@@ -52,12 +59,14 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/admin': typeof AuthenticatedAdminRoute
   '/admin-projects': typeof AuthenticatedAdminProjectsRoute
+  '/admin-summary': typeof AuthenticatedAdminSummaryRoute
   '/overview': typeof AuthenticatedOverviewRoute
 }
 export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/admin': typeof AuthenticatedAdminRoute
   '/admin-projects': typeof AuthenticatedAdminProjectsRoute
+  '/admin-summary': typeof AuthenticatedAdminSummaryRoute
   '/overview': typeof AuthenticatedOverviewRoute
   '/': typeof AuthenticatedIndexRoute
 }
@@ -67,20 +76,34 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
   '/_authenticated/admin-projects': typeof AuthenticatedAdminProjectsRoute
+  '/_authenticated/admin-summary': typeof AuthenticatedAdminSummaryRoute
   '/_authenticated/overview': typeof AuthenticatedOverviewRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/admin' | '/admin-projects' | '/overview'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/admin'
+    | '/admin-projects'
+    | '/admin-summary'
+    | '/overview'
   fileRoutesByTo: FileRoutesByTo
-  to: '/auth' | '/admin' | '/admin-projects' | '/overview' | '/'
+  to:
+    | '/auth'
+    | '/admin'
+    | '/admin-projects'
+    | '/admin-summary'
+    | '/overview'
+    | '/'
   id:
     | '__root__'
     | '/_authenticated'
     | '/auth'
     | '/_authenticated/admin'
     | '/_authenticated/admin-projects'
+    | '/_authenticated/admin-summary'
     | '/_authenticated/overview'
     | '/_authenticated/'
   fileRoutesById: FileRoutesById
@@ -120,6 +143,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedOverviewRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/admin-summary': {
+      id: '/_authenticated/admin-summary'
+      path: '/admin-summary'
+      fullPath: '/admin-summary'
+      preLoaderRoute: typeof AuthenticatedAdminSummaryRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/admin-projects': {
       id: '/_authenticated/admin-projects'
       path: '/admin-projects'
@@ -140,6 +170,7 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
   AuthenticatedAdminProjectsRoute: typeof AuthenticatedAdminProjectsRoute
+  AuthenticatedAdminSummaryRoute: typeof AuthenticatedAdminSummaryRoute
   AuthenticatedOverviewRoute: typeof AuthenticatedOverviewRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
 }
@@ -147,6 +178,7 @@ interface AuthenticatedRouteRouteChildren {
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRoute,
   AuthenticatedAdminProjectsRoute: AuthenticatedAdminProjectsRoute,
+  AuthenticatedAdminSummaryRoute: AuthenticatedAdminSummaryRoute,
   AuthenticatedOverviewRoute: AuthenticatedOverviewRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
 }
