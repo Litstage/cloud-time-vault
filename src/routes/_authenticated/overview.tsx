@@ -5,10 +5,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ChevronLeft, ChevronRight, ArrowLeft } from "lucide-react";
+import { ApprovalGate } from "@/components/approval-gate";
 
 export const Route = createFileRoute("/_authenticated/overview")({
   head: () => ({ meta: [{ title: "Månadsöversikt – Tidskoll" }] }),
-  component: OverviewPage,
+  component: () => (
+    <ApprovalGate>
+      <OverviewPage />
+    </ApprovalGate>
+  ),
 });
 
 type Entry = {

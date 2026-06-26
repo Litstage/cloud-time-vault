@@ -12,6 +12,24 @@ export type AdminEntry = {
   project_color: string | null;
 };
 
+export type ManagedUser = {
+  user_id: string;
+  email: string | null;
+  created_at: string;
+  status: "pending" | "approved" | "rejected";
+  approved_at: string | null;
+  is_admin: boolean;
+};
+
+async function assertAdmin(context: { supabase: any; userId: string }) {
+  const { data, error } = await context.supabase.rpc("has_role", {
+    _user_id: context.userId,
+    _role: "admin",
+  });
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Forbidden");
+}
+
 export const isAdmin = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -29,6 +47,140 @@ export const claimFirstAdmin = createServerFn({ method: "POST" })
     const { data, error } = await context.supabase.rpc("claim_first_admin");
     if (error) throw new Error(error.message);
     return { ok: Boolean(data) };
+  });
+
+export const getMyApprovalStatus = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const [{ data: roleData }, { data: appr }] = await Promise.all([
+      context.supabase.rpc("has_role", { _user_id: context.userId, _role: "admin" }),
+      context.supabase
+        .from("user_approvals")
+        .select("status")
+        .eq("user_id", context.userId)
+        .maybeSingle(),
+    ]);
+    const isAdmin = Boolean(roleData);
+    const status = (appr?.status as "pending" | "approved" | "rejected" | undefined) ?? "pending";
+    return { isAdmin, status, approved: isAdmin || status === "approved" };
+  });
+
+export const listManagedUsers = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<ManagedUser[]> => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const [{ data: approvals, error: aErr }, { data: roles, error: rErr }] = await Promise.all([
+      supabaseAdmin.from("user_approvals").select("user_id, status, approved_at"),
+      supabaseAdmin.from("user_roles").select("user_id, role"),
+    ]);
+    if (aErr) throw new Error(aErr.message);
+    if (rErr) throw new Error(rErr.message);
+
+    const adminIds = new Set(
+      (roles ?? []).filter((r: any) => r.role === "admin").map((r: any) => r.user_id as string),
+    );
+    const apprMap = new Map(
+      (approvals ?? []).map((a: any) => [a.user_id as string, a]),
+    );
+
+    const users: ManagedUser[] = [];
+    let page = 1;
+    while (page < 20) {
+      const { data: usersPage, error: uErr } = await supabaseAdmin.auth.admin.listUsers({
+        page,
+        perPage: 1000,
+      });
+      if (uErr) throw new Error(uErr.message);
+      for (const u of usersPage.users) {
+        const a = apprMap.get(u.id) as any;
+        users.push({
+          user_id: u.id,
+          email: u.email ?? null,
+          created_at: u.created_at,
+          status: (a?.status as ManagedUser["status"]) ?? "pending",
+          approved_at: (a?.approved_at as string | null) ?? null,
+          is_admin: adminIds.has(u.id),
+        });
+      }
+      if (usersPage.users.length < 1000) break;
+      page += 1;
+    }
+    users.sort((a, b) => {
+      const order = { pending: 0, approved: 1, rejected: 2 } as const;
+      if (order[a.status] !== order[b.status]) return order[a.status] - order[b.status];
+      return b.created_at.localeCompare(a.created_at);
+    });
+    return users;
+  });
+
+export const setUserApproval = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { userId: string; status: "pending" | "approved" | "rejected" }) => d)
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.from("user_approvals").upsert(
+      {
+        user_id: data.userId,
+        status: data.status,
+        approved_at: data.status === "approved" ? new Date().toISOString() : null,
+        approved_by: data.status === "approved" ? context.userId : null,
+      },
+      { onConflict: "user_id" },
+    );
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const setUserAdmin = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { userId: string; isAdmin: boolean }) => d)
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    if (!data.isAdmin && data.userId === context.userId) {
+      throw new Error("Du kan inte ta bort din egen adminroll");
+    }
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    if (data.isAdmin) {
+      const { error } = await supabaseAdmin
+        .from("user_roles")
+        .upsert({ user_id: data.userId, role: "admin" }, { onConflict: "user_id,role" });
+      if (error) throw new Error(error.message);
+      // Admins are auto-approved
+      await supabaseAdmin.from("user_approvals").upsert(
+        {
+          user_id: data.userId,
+          status: "approved",
+          approved_at: new Date().toISOString(),
+          approved_by: context.userId,
+        },
+        { onConflict: "user_id" },
+      );
+    } else {
+      const { error } = await supabaseAdmin
+        .from("user_roles")
+        .delete()
+        .eq("user_id", data.userId)
+        .eq("role", "admin");
+      if (error) throw new Error(error.message);
+    }
+    return { ok: true };
+  });
+
+export const deleteManagedUser = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { userId: string }) => d)
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    if (data.userId === context.userId) {
+      throw new Error("Du kan inte ta bort dig själv");
+    }
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.auth.admin.deleteUser(data.userId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
   });
 
 export const getAllTimeEntries = createServerFn({ method: "GET" })

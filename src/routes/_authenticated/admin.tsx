@@ -1,14 +1,24 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Download, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Download, ShieldCheck, Check, X, Trash2, Shield, ShieldOff, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
-import { isAdmin, claimFirstAdmin, getAllTimeEntries, type AdminEntry } from "@/lib/admin.functions";
+import {
+  isAdmin,
+  claimFirstAdmin,
+  getAllTimeEntries,
+  listManagedUsers,
+  setUserApproval,
+  setUserAdmin,
+  deleteManagedUser,
+  type AdminEntry,
+  type ManagedUser,
+} from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({ meta: [{ title: "Admin – Tidskoll" }] }),
@@ -19,10 +29,145 @@ function formatHours(ms: number) {
   return (ms / 3600000).toFixed(2);
 }
 
+function StatusBadge({ status }: { status: ManagedUser["status"] }) {
+  const styles: Record<ManagedUser["status"], string> = {
+    pending: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+    approved: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+    rejected: "bg-destructive/15 text-destructive",
+  };
+  const labels: Record<ManagedUser["status"], string> = {
+    pending: "Väntar",
+    approved: "Godkänd",
+    rejected: "Nekad",
+  };
+  return (
+    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${styles[status]}`}>
+      {labels[status]}
+    </span>
+  );
+}
+
+function UsersSection(props: {
+  users: ManagedUser[];
+  loading: boolean;
+  busy: boolean;
+  onApprove: (u: ManagedUser) => void;
+  onReject: (u: ManagedUser) => void;
+  onReset: (u: ManagedUser) => void;
+  onToggleAdmin: (u: ManagedUser) => void;
+  onDelete: (u: ManagedUser) => void;
+}) {
+  const { users, loading, busy } = props;
+  const pending = users.filter((u) => u.status === "pending");
+  return (
+    <section className="space-y-2">
+      <div className="flex items-center justify-between px-1">
+        <h2 className="text-sm font-medium text-muted-foreground">
+          Användare ({users.length})
+        </h2>
+        {pending.length > 0 && (
+          <span className="text-xs font-medium text-amber-600 dark:text-amber-400">
+            {pending.length} väntar på godkännande
+          </span>
+        )}
+      </div>
+      <Card className="divide-y p-0">
+        {loading ? (
+          <div className="p-6 text-center text-sm text-muted-foreground">Laddar…</div>
+        ) : users.length === 0 ? (
+          <div className="p-6 text-center text-sm text-muted-foreground">Inga användare.</div>
+        ) : (
+          users.map((u) => (
+            <div
+              key={u.user_id}
+              className="flex flex-wrap items-center gap-3 px-4 py-3"
+            >
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="truncate text-sm font-medium">{u.email ?? u.user_id}</span>
+                  {u.is_admin && (
+                    <span className="rounded-full bg-primary/15 px-2 py-0.5 text-xs font-medium text-primary">
+                      Admin
+                    </span>
+                  )}
+                  <StatusBadge status={u.status} />
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Skapad {new Date(u.created_at).toLocaleDateString("sv-SE")}
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-1">
+                {u.status !== "approved" && (
+                  <Button
+                    size="sm"
+                    variant="default"
+                    disabled={busy}
+                    onClick={() => props.onApprove(u)}
+                  >
+                    <Check className="mr-1 h-4 w-4" /> Godkänn
+                  </Button>
+                )}
+                {u.status !== "rejected" && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={busy}
+                    onClick={() => props.onReject(u)}
+                  >
+                    <X className="mr-1 h-4 w-4" /> Neka
+                  </Button>
+                )}
+                {u.status !== "pending" && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={busy}
+                    onClick={() => props.onReset(u)}
+                    title="Återställ till väntande"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={busy}
+                  onClick={() => props.onToggleAdmin(u)}
+                  title={u.is_admin ? "Ta bort admin" : "Gör till admin"}
+                >
+                  {u.is_admin ? (
+                    <ShieldOff className="h-4 w-4" />
+                  ) : (
+                    <Shield className="h-4 w-4" />
+                  )}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={busy}
+                  onClick={() => props.onDelete(u)}
+                  className="text-destructive hover:text-destructive"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          ))
+        )}
+      </Card>
+    </section>
+  );
+}
+
 function AdminPage() {
   const checkAdmin = useServerFn(isAdmin);
   const claim = useServerFn(claimFirstAdmin);
   const fetchAll = useServerFn(getAllTimeEntries);
+  const fetchUsers = useServerFn(listManagedUsers);
+  const setApproval = useServerFn(setUserApproval);
+  const setAdmin = useServerFn(setUserAdmin);
+  const deleteUser = useServerFn(deleteManagedUser);
+  const qc = useQueryClient();
 
   const today = new Date();
   const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
@@ -34,6 +179,41 @@ function AdminPage() {
   const adminQ = useQuery({
     queryKey: ["is-admin"],
     queryFn: () => checkAdmin({ data: undefined }),
+  });
+
+  const usersQ = useQuery({
+    queryKey: ["managed-users"],
+    enabled: !!adminQ.data?.isAdmin,
+    queryFn: () => fetchUsers({ data: undefined }),
+  });
+
+  const approvalMut = useMutation({
+    mutationFn: (v: { userId: string; status: "pending" | "approved" | "rejected" }) =>
+      setApproval({ data: v }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["managed-users"] });
+      toast.success("Status uppdaterad");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const adminMut = useMutation({
+    mutationFn: (v: { userId: string; isAdmin: boolean }) => setAdmin({ data: v }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["managed-users"] });
+      toast.success("Adminroll uppdaterad");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: (userId: string) => deleteUser({ data: { userId } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["managed-users"] });
+      qc.invalidateQueries({ queryKey: ["admin-entries"] });
+      toast.success("Användare borttagen");
+    },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const entriesQ = useQuery({
@@ -143,6 +323,21 @@ function AdminPage() {
           </Card>
         ) : (
           <>
+            <UsersSection
+              users={usersQ.data ?? []}
+              loading={usersQ.isLoading}
+              onApprove={(u) => approvalMut.mutate({ userId: u.user_id, status: "approved" })}
+              onReject={(u) => approvalMut.mutate({ userId: u.user_id, status: "rejected" })}
+              onReset={(u) => approvalMut.mutate({ userId: u.user_id, status: "pending" })}
+              onToggleAdmin={(u) => adminMut.mutate({ userId: u.user_id, isAdmin: !u.is_admin })}
+              onDelete={(u) => {
+                if (confirm(`Ta bort ${u.email ?? u.user_id}? Detta kan inte ångras.`)) {
+                  deleteMut.mutate(u.user_id);
+                }
+              }}
+              busy={approvalMut.isPending || adminMut.isPending || deleteMut.isPending}
+            />
+
             <Card className="p-4">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">

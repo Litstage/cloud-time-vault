@@ -17,10 +17,15 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Play, Square, Plus, Download, LogOut, FolderKanban, Trash2, MoreVertical, BarChart3, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
+import { ApprovalGate } from "@/components/approval-gate";
 
 export const Route = createFileRoute("/_authenticated/")({
   head: () => ({ meta: [{ title: "Tidskoll – Tidsregistrering" }] }),
-  component: HomePage,
+  component: () => (
+    <ApprovalGate>
+      <HomePage />
+    </ApprovalGate>
+  ),
 });
 
 type Project = { id: string; name: string; client: string | null; color: string };
