@@ -284,6 +284,7 @@ function AdminProjectsPage() {
     setEditingClient(c);
     setEditClientName(c.name);
     setEditClientNote(c.note ?? "");
+    setEditClientRate(c.hourly_rate ? String(c.hourly_rate) : "");
   }
 
   return (
