@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Download, ShieldCheck, Check, X, Trash2, Shield, ShieldOff, RotateCcw, UserPlus, Pencil, Plus, CalendarIcon } from "lucide-react";
+import { ArrowLeft, Download, ShieldCheck, Check, X, Trash2, Shield, ShieldOff, RotateCcw, UserPlus, Pencil, Plus, CalendarIcon, History } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -35,8 +35,10 @@ import {
   adminCreateTimeEntry,
   adminUpdateTimeEntry,
   adminDeleteTimeEntry,
+  getAuditLog,
   type AdminEntry,
   type ManagedUser,
+  type AuditLogEntry,
 } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/_authenticated/admin")({
@@ -216,6 +218,13 @@ function AdminPage() {
     queryFn: () => checkAdmin({ data: undefined }),
   });
 
+  const auditFn = useServerFn(getAuditLog);
+  const auditQ = useQuery({
+    queryKey: ["audit-log"],
+    enabled: !!adminQ.data?.isAdmin,
+    queryFn: () => auditFn({ data: { limit: 200 } }),
+  });
+
   const usersQ = useQuery({
     queryKey: ["managed-users"],
     enabled: !!adminQ.data?.isAdmin,
@@ -311,6 +320,7 @@ function AdminPage() {
     }) => createEntryFn({ data: v }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-entries"] });
+      qc.invalidateQueries({ queryKey: ["audit-log"] });
       toast.success("Tid tillagd");
       setEntryDialogOpen(false);
       setEditingEntry(null);
@@ -325,6 +335,7 @@ function AdminPage() {
     }) => updateEntryFn({ data: v }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-entries"] });
+      qc.invalidateQueries({ queryKey: ["audit-log"] });
       toast.success("Tid uppdaterad");
       setEntryDialogOpen(false);
       setEditingEntry(null);
@@ -336,6 +347,7 @@ function AdminPage() {
     mutationFn: (id: string) => deleteEntryFn({ data: { id } }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-entries"] });
+      qc.invalidateQueries({ queryKey: ["audit-log"] });
       toast.success("Tid borttagen");
     },
     onError: (e: Error) => toast.error(e.message),
@@ -648,6 +660,8 @@ function AdminPage() {
                 </table>
               </Card>
             </section>
+
+            <AuditLogSection entries={auditQ.data ?? []} loading={auditQ.isLoading} />
           </>
         )}
       </main>
@@ -738,6 +752,101 @@ type EntryFormBase = {
 };
 
 function pad2(n: number) { return String(n).padStart(2, "0"); }
+
+function formatAuditDate(iso: string) {
+  return new Date(iso).toLocaleString("sv-SE");
+}
+
+function describeEntry(d: Record<string, unknown> | null | undefined) {
+  if (!d) return "—";
+  const start = d.start_time ? new Date(String(d.start_time)) : null;
+  const end = d.end_time ? new Date(String(d.end_time)) : null;
+  const datePart = start ? start.toLocaleDateString("sv-SE") : "";
+  const timePart =
+    start && end
+      ? `${start.toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" })}–${end.toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" })}`
+      : "";
+  const hours =
+    start && end
+      ? ` (${((end.getTime() - start.getTime()) / 3600000).toFixed(2)} h)`
+      : "";
+  const desc = d.description ? ` – ${String(d.description)}` : "";
+  return `${datePart} ${timePart}${hours}${desc}`.trim();
+}
+
+function AuditLogSection({ entries, loading }: { entries: AuditLogEntry[]; loading: boolean }) {
+  const actionLabel: Record<AuditLogEntry["action"], string> = {
+    create: "Skapad",
+    update: "Ändrad",
+    delete: "Borttagen",
+  };
+  const actionColor: Record<AuditLogEntry["action"], string> = {
+    create: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+    update: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+    delete: "bg-destructive/15 text-destructive",
+  };
+  return (
+    <section className="space-y-2">
+      <div className="flex items-center gap-2 px-1">
+        <History className="h-4 w-4 text-muted-foreground" />
+        <h2 className="text-sm font-medium text-muted-foreground">
+          Ändringshistorik ({entries.length})
+        </h2>
+      </div>
+      <Card className="divide-y p-0">
+        {loading ? (
+          <div className="p-6 text-center text-sm text-muted-foreground">Laddar…</div>
+        ) : entries.length === 0 ? (
+          <div className="p-6 text-center text-sm text-muted-foreground">
+            Inga loggade ändringar än.
+          </div>
+        ) : (
+          entries.map((e) => {
+            const before = (e.before_data as Record<string, unknown> | null) ?? null;
+            const after = (e.after_data as Record<string, unknown> | null) ?? null;
+            return (
+              <div key={e.id} className="space-y-2 px-4 py-3 text-sm">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${actionColor[e.action]}`}>
+                    {actionLabel[e.action]}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {formatAuditDate(e.created_at)}
+                  </span>
+                  <span className="text-xs">
+                    av <span className="font-medium">{e.changed_by_email ?? e.changed_by}</span>
+                  </span>
+                  {e.entry_user_email && (
+                    <span className="text-xs text-muted-foreground">
+                      → tidspost för <span className="font-medium">{e.entry_user_email}</span>
+                    </span>
+                  )}
+                </div>
+                {e.action === "update" ? (
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <div className="rounded-md bg-muted/40 px-3 py-2 text-xs">
+                      <div className="mb-1 font-medium text-muted-foreground">Före</div>
+                      <div className="font-mono">{describeEntry(before)}</div>
+                    </div>
+                    <div className="rounded-md bg-muted/40 px-3 py-2 text-xs">
+                      <div className="mb-1 font-medium text-muted-foreground">Efter</div>
+                      <div className="font-mono">{describeEntry(after)}</div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-md bg-muted/40 px-3 py-2 text-xs">
+                    <div className="font-mono">{describeEntry(e.action === "delete" ? before : after)}</div>
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
+      </Card>
+    </section>
+  );
+}
+
 function dateToYmd(d: Date) {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 }

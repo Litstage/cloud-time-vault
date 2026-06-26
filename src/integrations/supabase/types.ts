@@ -79,6 +79,42 @@ export type Database = {
           },
         ]
       }
+      time_entry_audit: {
+        Row: {
+          action: string
+          after_data: Json | null
+          before_data: Json | null
+          changed_by: string
+          changed_by_email: string | null
+          created_at: string
+          entry_id: string | null
+          entry_user_id: string | null
+          id: string
+        }
+        Insert: {
+          action: string
+          after_data?: Json | null
+          before_data?: Json | null
+          changed_by: string
+          changed_by_email?: string | null
+          created_at?: string
+          entry_id?: string | null
+          entry_user_id?: string | null
+          id?: string
+        }
+        Update: {
+          action?: string
+          after_data?: Json | null
+          before_data?: Json | null
+          changed_by?: string
+          changed_by_email?: string | null
+          created_at?: string
+          entry_id?: string | null
+          entry_user_id?: string | null
+          id?: string
+        }
+        Relationships: []
+      }
       user_approvals: {
         Row: {
           approved_at: string | null
