@@ -447,15 +447,15 @@ function ManualEntryDialog({ open, onOpenChange, projects }: { open: boolean; on
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader><DialogTitle>Lägg till tid</DialogTitle></DialogHeader>
-        <div className="space-y-4">
+      <DialogContent className="sm:max-w-xl p-6 gap-5">
+        <DialogHeader><DialogTitle className="text-xl">Lägg till tid</DialogTitle></DialogHeader>
+        <div className="space-y-5">
           <div className="space-y-2">
-            <Label>Datum</Label>
+            <Label className="text-base">Datum</Label>
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline" className={cn("w-full justify-start text-left font-normal")}>
-                  <CalendarIcon className="mr-2 h-4 w-4" />
+                <Button variant="outline" className={cn("w-full justify-start text-left font-normal h-12 text-base")}>
+                  <CalendarIcon className="mr-2 h-5 w-5" />
                   {date.toLocaleDateString("sv-SE", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
                 </Button>
               </PopoverTrigger>
@@ -472,18 +472,18 @@ function ManualEntryDialog({ open, onOpenChange, projects }: { open: boolean; on
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label>Start</Label>
-              <Input type="time" value={start} onChange={(e) => setStart(e.target.value)} />
+              <Label className="text-base">Start</Label>
+              <Input type="time" value={start} onChange={(e) => setStart(e.target.value)} className="h-12 text-base" />
             </div>
             <div className="space-y-2">
-              <Label>Slut</Label>
-              <Input type="time" value={end} onChange={(e) => setEnd(e.target.value)} />
+              <Label className="text-base">Slut</Label>
+              <Input type="time" value={end} onChange={(e) => setEnd(e.target.value)} className="h-12 text-base" />
             </div>
           </div>
           <div className="space-y-2">
-            <Label>Projekt</Label>
+            <Label className="text-base">Projekt</Label>
             <Select value={projectId} onValueChange={setProjectId}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-12 text-base"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">Inget projekt</SelectItem>
                 {projects.map((p) => (
@@ -495,13 +495,13 @@ function ManualEntryDialog({ open, onOpenChange, projects }: { open: boolean; on
             </Select>
           </div>
           <div className="space-y-2">
-            <Label>Beskrivning</Label>
-            <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Vad gjorde du?" />
+            <Label className="text-base">Beskrivning</Label>
+            <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Vad gjorde du?" className="h-12 text-base" />
           </div>
         </div>
         <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>Avbryt</Button>
-          <Button onClick={save}>Spara</Button>
+          <Button variant="ghost" size="lg" onClick={() => onOpenChange(false)}>Avbryt</Button>
+          <Button size="lg" onClick={save}>Spara</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
