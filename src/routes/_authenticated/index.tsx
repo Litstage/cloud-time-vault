@@ -51,6 +51,14 @@ function formatDuration(ms: number) {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
+function getIsoWeek(date: Date) {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const day = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+}
+
 function HomePage() {
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -59,6 +67,7 @@ function HomePage() {
   const [projectId, setProjectId] = useState<string>("none");
   const [manualOpen, setManualOpen] = useState(false);
   const [projectsOpen, setProjectsOpen] = useState(false);
+  const [range, setRange] = useState<"day" | "week" | "month">("day");
   const [filterDate, setFilterDate] = useState<Date>(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -170,20 +179,31 @@ function HomePage() {
 
   const grouped = useMemo(() => {
     const map = new Map<string, Entry[]>();
-    const day0 = new Date(filterDate);
-    day0.setHours(0, 0, 0, 0);
-    const day1 = new Date(day0);
-    day1.setDate(day1.getDate() + 1);
+    const start = new Date(filterDate);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(start);
+    if (range === "day") {
+      end.setDate(end.getDate() + 1);
+    } else if (range === "week") {
+      const dow = (start.getDay() + 6) % 7;
+      start.setDate(start.getDate() - dow);
+      end.setTime(start.getTime());
+      end.setDate(end.getDate() + 7);
+    } else {
+      start.setDate(1);
+      end.setTime(start.getTime());
+      end.setMonth(end.getMonth() + 1);
+    }
     for (const e of entriesQ.data ?? []) {
       if (!e.end_time) continue;
       const t = new Date(e.start_time).getTime();
-      if (t < day0.getTime() || t >= day1.getTime()) continue;
+      if (t < start.getTime() || t >= end.getTime()) continue;
       const day = new Date(e.start_time).toLocaleDateString("sv-SE", { weekday: "long", day: "numeric", month: "long" });
       if (!map.has(day)) map.set(day, []);
       map.get(day)!.push(e);
     }
     return Array.from(map.entries());
-  }, [entriesQ.data, filterDate]);
+  }, [entriesQ.data, filterDate, range]);
 
   const totals = useMemo(() => {
     const totals = new Map<string, number>();
@@ -278,15 +298,29 @@ function HomePage() {
 
         {/* Entries */}
         <section className="space-y-4">
-          <div className="flex items-center justify-between gap-2">
-            <h2 className="text-sm font-medium text-muted-foreground">Poster för dagen</h2>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-medium text-muted-foreground">Poster</h2>
+              <Select value={range} onValueChange={(v) => setRange(v as "day" | "week" | "month")}>
+                <SelectTrigger className="h-8 w-[110px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="day">Dag</SelectItem>
+                  <SelectItem value="week">Vecka</SelectItem>
+                  <SelectItem value="month">Månad</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div className="flex items-center gap-1">
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => {
                   const d = new Date(filterDate);
-                  d.setDate(d.getDate() - 1);
+                  if (range === "day") d.setDate(d.getDate() - 1);
+                  else if (range === "week") d.setDate(d.getDate() - 7);
+                  else d.setMonth(d.getMonth() - 1);
                   setFilterDate(d);
                 }}
               >
@@ -296,7 +330,11 @@ function HomePage() {
                 <PopoverTrigger asChild>
                   <Button variant="outline" size="sm" className="font-normal">
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {filterDate.toLocaleDateString("sv-SE", { weekday: "short", day: "numeric", month: "short" })}
+                    {range === "day"
+                      ? filterDate.toLocaleDateString("sv-SE", { weekday: "short", day: "numeric", month: "short" })
+                      : range === "month"
+                      ? filterDate.toLocaleDateString("sv-SE", { month: "long", year: "numeric" })
+                      : `v.${getIsoWeek(filterDate)}`}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="end">
@@ -314,7 +352,9 @@ function HomePage() {
                 size="icon"
                 onClick={() => {
                   const d = new Date(filterDate);
-                  d.setDate(d.getDate() + 1);
+                  if (range === "day") d.setDate(d.getDate() + 1);
+                  else if (range === "week") d.setDate(d.getDate() + 7);
+                  else d.setMonth(d.getMonth() + 1);
                   setFilterDate(d);
                 }}
               >
@@ -326,7 +366,7 @@ function HomePage() {
             <Card className="p-8 text-center text-sm text-muted-foreground">Laddar…</Card>
           ) : grouped.length === 0 ? (
             <Card className="p-8 text-center text-sm text-muted-foreground">
-              Inga tidsposter denna dag.
+              Inga tidsposter i vald period.
             </Card>
           ) : (
             grouped.map(([day, list]) => (
