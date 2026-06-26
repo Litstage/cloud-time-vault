@@ -443,17 +443,23 @@ function ManualEntryDialog({ open, onOpenChange, projects }: { open: boolean; on
 
   function normalizeTime(v: string): string | null {
     const t = v.trim().replace(/[.,]/g, ":");
-    let m = /^(\d{1,2}):(\d{2})$/.exec(t);
-    if (!m) {
+    let hStr: string | null = null;
+    let miStr: string | null = null;
+    const m = /^(\d{1,2}):(\d{2})$/.exec(t);
+    if (m) {
+      hStr = m[1];
+      miStr = m[2];
+    } else {
       const d = /^(\d{3,4})$/.exec(t);
       if (d) {
         const s = d[1].padStart(4, "0");
-        m = [s, s.slice(0, 2), s.slice(2)] as RegExpExecArray;
+        hStr = s.slice(0, 2);
+        miStr = s.slice(2);
       }
     }
-    if (!m) return null;
-    const h = Number(m[1]);
-    const mi = Number(m[2]);
+    if (hStr === null || miStr === null) return null;
+    const h = Number(hStr);
+    const mi = Number(miStr);
     if (h < 0 || h > 23 || mi < 0 || mi > 59) return null;
     return `${String(h).padStart(2, "0")}:${String(mi).padStart(2, "0")}`;
   }
