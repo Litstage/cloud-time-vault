@@ -1,12 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Download, ShieldCheck, Check, X, Trash2, Shield, ShieldOff, RotateCcw, UserPlus, Pencil } from "lucide-react";
+import { ArrowLeft, Download, ShieldCheck, Check, X, Trash2, Shield, ShieldOff, RotateCcw, UserPlus, Pencil, Plus, CalendarIcon } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -15,6 +15,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
 import {
   isAdmin,
   claimFirstAdmin,
@@ -25,6 +32,9 @@ import {
   deleteManagedUser,
   createManagedUser,
   updateManagedUser,
+  adminCreateTimeEntry,
+  adminUpdateTimeEntry,
+  adminDeleteTimeEntry,
   type AdminEntry,
   type ManagedUser,
 } from "@/lib/admin.functions";
@@ -189,6 +199,9 @@ function AdminPage() {
   const deleteUser = useServerFn(deleteManagedUser);
   const createUser = useServerFn(createManagedUser);
   const updateUser = useServerFn(updateManagedUser);
+  const createEntryFn = useServerFn(adminCreateTimeEntry);
+  const updateEntryFn = useServerFn(adminUpdateTimeEntry);
+  const deleteEntryFn = useServerFn(adminDeleteTimeEntry);
   const qc = useQueryClient();
 
   const today = new Date();
@@ -270,6 +283,60 @@ function AdminPage() {
       qc.invalidateQueries({ queryKey: ["admin-entries"] });
       toast.success("Användare uppdaterad");
       setEditing(null);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  type ProjectLite = { id: string; name: string; color: string };
+  const projectsQ = useQuery({
+    queryKey: ["projects"],
+    enabled: !!adminQ.data?.isAdmin,
+    queryFn: async (): Promise<ProjectLite[]> => {
+      const { data, error } = await supabase
+        .from("projects")
+        .select("id, name, color")
+        .order("name");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const [entryDialogOpen, setEntryDialogOpen] = useState(false);
+  const [editingEntry, setEditingEntry] = useState<AdminEntry | null>(null);
+
+  const createEntryMut = useMutation({
+    mutationFn: (v: {
+      userId: string; projectId: string | null; description: string | null;
+      date: string; start: string; end: string;
+    }) => createEntryFn({ data: v }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-entries"] });
+      toast.success("Tid tillagd");
+      setEntryDialogOpen(false);
+      setEditingEntry(null);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const updateEntryMut = useMutation({
+    mutationFn: (v: {
+      id: string; projectId: string | null; description: string | null;
+      date: string; start: string; end: string;
+    }) => updateEntryFn({ data: v }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-entries"] });
+      toast.success("Tid uppdaterad");
+      setEntryDialogOpen(false);
+      setEditingEntry(null);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const deleteEntryMut = useMutation({
+    mutationFn: (id: string) => deleteEntryFn({ data: { id } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-entries"] });
+      toast.success("Tid borttagen");
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -505,9 +572,17 @@ function AdminPage() {
             </section>
 
             <section className="space-y-2">
-              <h2 className="px-1 text-sm font-medium text-muted-foreground">
-                Alla poster ({rows.length})
-              </h2>
+              <div className="flex items-center justify-between px-1">
+                <h2 className="text-sm font-medium text-muted-foreground">
+                  Alla poster ({rows.length})
+                </h2>
+                <Button
+                  size="sm"
+                  onClick={() => { setEditingEntry(null); setEntryDialogOpen(true); }}
+                >
+                  <Plus className="mr-1 h-4 w-4" /> Lägg till tid
+                </Button>
+              </div>
               <Card className="overflow-x-auto p-0">
                 <table className="w-full text-sm">
                   <thead className="bg-muted/50 text-left text-xs uppercase text-muted-foreground">
@@ -517,6 +592,7 @@ function AdminPage() {
                       <th className="px-3 py-2">Projekt</th>
                       <th className="px-3 py-2">Beskrivning</th>
                       <th className="px-3 py-2 text-right">Timmar</th>
+                      <th className="px-3 py-2"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
@@ -542,6 +618,29 @@ function AdminPage() {
                           <td className="px-3 py-2 text-right font-mono tabular-nums">
                             {r.end_time ? formatHours(ms) : "–"}
                           </td>
+                          <td className="px-3 py-2 whitespace-nowrap text-right">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              title="Redigera"
+                              onClick={() => { setEditingEntry(r); setEntryDialogOpen(true); }}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              title="Ta bort"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => {
+                                if (confirm("Ta bort denna tidspost?")) {
+                                  deleteEntryMut.mutate(r.id);
+                                }
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </td>
                         </tr>
                       );
                     })}
@@ -552,6 +651,17 @@ function AdminPage() {
           </>
         )}
       </main>
+
+      <EntryDialog
+        open={entryDialogOpen}
+        onOpenChange={(v) => { setEntryDialogOpen(v); if (!v) setEditingEntry(null); }}
+        entry={editingEntry}
+        users={usersQ.data ?? []}
+        projects={projectsQ.data ?? []}
+        onCreate={(v) => createEntryMut.mutate(v)}
+        onUpdate={(v) => updateEntryMut.mutate(v)}
+        saving={createEntryMut.isPending || updateEntryMut.isPending}
+      />
 
       <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
         <DialogContent>
@@ -615,5 +725,204 @@ function AdminPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+type ProjectLite = { id: string; name: string; color: string };
+type EntryFormBase = {
+  projectId: string | null;
+  description: string | null;
+  date: string;
+  start: string;
+  end: string;
+};
+
+function pad2(n: number) { return String(n).padStart(2, "0"); }
+function dateToYmd(d: Date) {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+function dateToHm(d: Date) {
+  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+function normalizeTime(v: string): string | null {
+  const t = v.trim().replace(/[.,]/g, ":");
+  let h: string | null = null, m: string | null = null;
+  const mm = /^(\d{1,2}):(\d{2})$/.exec(t);
+  if (mm) { h = mm[1]; m = mm[2]; }
+  else {
+    const d = /^(\d{3,4})$/.exec(t);
+    if (d) { const s = d[1].padStart(4, "0"); h = s.slice(0, 2); m = s.slice(2); }
+  }
+  if (h === null || m === null) return null;
+  const hi = Number(h), mi = Number(m);
+  if (hi < 0 || hi > 23 || mi < 0 || mi > 59) return null;
+  return `${pad2(hi)}:${pad2(mi)}`;
+}
+
+function EntryDialog(props: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  entry: AdminEntry | null;
+  users: ManagedUser[];
+  projects: ProjectLite[];
+  onCreate: (v: EntryFormBase & { userId: string }) => void;
+  onUpdate: (v: EntryFormBase & { id: string }) => void;
+  saving: boolean;
+}) {
+  const { open, onOpenChange, entry, users, projects, onCreate, onUpdate, saving } = props;
+  const isEdit = !!entry;
+
+  const today = new Date();
+  const [userId, setUserId] = useState<string>("");
+  const [projectId, setProjectId] = useState<string>("none");
+  const [description, setDescription] = useState("");
+  const [date, setDate] = useState<Date>(today);
+  const [dateText, setDateText] = useState(dateToYmd(today));
+  const [start, setStart] = useState("09:00");
+  const [end, setEnd] = useState("10:00");
+
+  useEffect(() => {
+    if (!open) return;
+    if (entry) {
+      const s = new Date(entry.start_time);
+      const e = entry.end_time ? new Date(entry.end_time) : new Date(s.getTime() + 3600 * 1000);
+      setUserId(entry.user_id);
+      setProjectId(/* match by name */ projects.find((p) => p.name === entry.project_name)?.id ?? "none");
+      setDescription(entry.description ?? "");
+      setDate(s); setDateText(dateToYmd(s));
+      setStart(dateToHm(s)); setEnd(dateToHm(e));
+    } else {
+      const d = new Date();
+      setUserId(users[0]?.user_id ?? "");
+      setProjectId("none"); setDescription("");
+      setDate(d); setDateText(dateToYmd(d));
+      setStart("09:00"); setEnd("10:00");
+    }
+  }, [open, entry, users, projects]);
+
+  function syncDate(d: Date) { setDate(d); setDateText(dateToYmd(d)); }
+  function onDateTextChange(v: string) {
+    setDateText(v);
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v);
+    if (m) {
+      const p = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+      if (!isNaN(p.getTime())) setDate(p);
+    }
+  }
+  const dateValid = /^\d{4}-\d{2}-\d{2}$/.test(dateText) && !isNaN(new Date(dateText).getTime());
+  const startNorm = normalizeTime(start);
+  const endNorm = normalizeTime(end);
+
+  function save() {
+    if (!isEdit && !userId) return toast.error("Välj användare");
+    if (!dateValid) return toast.error("Ogiltigt datum");
+    if (!startNorm) return toast.error("Ogiltig starttid");
+    if (!endNorm) return toast.error("Ogiltig sluttid");
+    const base: EntryFormBase = {
+      projectId: projectId === "none" ? null : projectId,
+      description: description.trim() || null,
+      date: dateText,
+      start: startNorm,
+      end: endNorm,
+    };
+    if (isEdit && entry) onUpdate({ ...base, id: entry.id });
+    else onCreate({ ...base, userId });
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-xl p-6 gap-5">
+        <DialogHeader>
+          <DialogTitle className="text-xl">{isEdit ? "Redigera tid" : "Lägg till tid"}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-1">
+            <Label className="text-xs">Användare</Label>
+            {isEdit ? (
+              <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm">
+                {entry?.user_email ?? entry?.user_id}
+              </div>
+            ) : (
+              <Select value={userId} onValueChange={setUserId}>
+                <SelectTrigger><SelectValue placeholder="Välj användare" /></SelectTrigger>
+                <SelectContent>
+                  {users.map((u) => (
+                    <SelectItem key={u.user_id} value={u.user_id}>
+                      {u.email ?? u.user_id}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Datum</Label>
+            <div className="flex gap-2">
+              <Input
+                value={dateText}
+                onChange={(e) => onDateTextChange(e.target.value)}
+                placeholder="ÅÅÅÅ-MM-DD"
+                inputMode="numeric"
+                className={cn("flex-1", !dateValid && "border-destructive")}
+              />
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="icon" aria-label="Öppna kalender">
+                    <CalendarIcon className="h-4 w-4" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="end">
+                  <Calendar mode="single" selected={date} onSelect={(d) => d && syncDate(d)} initialFocus className={cn("p-3 pointer-events-auto")} />
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <Label className="text-xs">Start</Label>
+              <Input
+                value={start}
+                onChange={(e) => setStart(e.target.value)}
+                inputMode="numeric"
+                placeholder="HH:MM"
+                className={cn(!startNorm && "border-destructive")}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Slut</Label>
+              <Input
+                value={end}
+                onChange={(e) => setEnd(e.target.value)}
+                inputMode="numeric"
+                placeholder="HH:MM"
+                className={cn(!endNorm && "border-destructive")}
+              />
+            </div>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Projekt</Label>
+            <Select value={projectId} onValueChange={setProjectId}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Inget projekt</SelectItem>
+                {projects.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    <span style={{ color: p.color }}>● </span>{p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Beskrivning</Label>
+            <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Vad gjordes?" />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>Avbryt</Button>
+          <Button onClick={save} disabled={saving}>Spara</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
