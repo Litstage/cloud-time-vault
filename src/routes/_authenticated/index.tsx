@@ -19,7 +19,7 @@ import {
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Play, Square, Plus, Download, LogOut, FolderKanban, Trash2, MoreVertical, BarChart3, ShieldCheck, CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react";
+import { Play, Square, Plus, Download, LogOut, FolderKanban, Trash2, MoreVertical, BarChart3, ShieldCheck, CalendarIcon, ChevronLeft, ChevronRight, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { ApprovalGate } from "@/components/approval-gate";
 import { isAdmin as isAdminFn } from "@/lib/admin.functions";
@@ -530,25 +530,11 @@ function ManualEntryDialog({ open, onOpenChange, projects }: { open: boolean; on
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label className="text-base">Start</Label>
-              <Input
-                type="text"
-                inputMode="numeric"
-                placeholder="HH:MM"
-                value={start}
-                onChange={(e) => setStart(e.target.value)}
-                className={cn("h-12 text-base w-full min-w-0", !startNorm && "border-destructive")}
-              />
+              <TimeField value={start} onChange={setStart} valid={!!startNorm} />
             </div>
             <div className="space-y-2">
               <Label className="text-base">Slut</Label>
-              <Input
-                type="text"
-                inputMode="numeric"
-                placeholder="HH:MM"
-                value={end}
-                onChange={(e) => setEnd(e.target.value)}
-                className={cn("h-12 text-base w-full min-w-0", !endNorm && "border-destructive")}
-              />
+              <TimeField value={end} onChange={setEnd} valid={!!endNorm} />
             </div>
           </div>
           <div className="space-y-2">
@@ -580,6 +566,52 @@ function ManualEntryDialog({ open, onOpenChange, projects }: { open: boolean; on
 }
 
 const COLORS = ["#ef4444", "#f97316", "#eab308", "#22c55e", "#06b6d4", "#6366f1", "#ec4899", "#8b5cf6"];
+
+function TimeField({ value, onChange, valid }: { value: string; onChange: (v: string) => void; valid: boolean }) {
+  const [open, setOpen] = useState(false);
+  const options: string[] = [];
+  for (let h = 0; h < 24; h++) {
+    for (let m = 0; m < 60; m += 15) {
+      options.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
+    }
+  }
+  return (
+    <div className="flex gap-2">
+      <Input
+        type="text"
+        inputMode="numeric"
+        placeholder="HH:MM"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={cn("h-12 text-base flex-1 min-w-0", !valid && "border-destructive")}
+      />
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button variant="outline" size="icon" className="h-12 w-12 shrink-0" aria-label="Välj tid">
+            <Clock className="h-5 w-5" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-32 p-1" align="end">
+          <div className="max-h-64 overflow-y-auto">
+            {options.map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => { onChange(t); setOpen(false); }}
+                className={cn(
+                  "w-full text-left px-3 py-2 rounded-md text-base hover:bg-accent",
+                  value === t && "bg-accent"
+                )}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
 
 function ProjectsDialog({ open, onOpenChange, projects, isAdmin }: { open: boolean; onOpenChange: (v: boolean) => void; projects: Project[]; isAdmin: boolean }) {
   const qc = useQueryClient();
