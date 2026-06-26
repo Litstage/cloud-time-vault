@@ -338,6 +338,7 @@ function AdminPage() {
     mutationFn: (id: string) => deleteEntryFn({ data: { id } }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-entries"] });
+      qc.invalidateQueries({ queryKey: ["audit-log"] });
       toast.success("Tid borttagen");
     },
     onError: (e: Error) => toast.error(e.message),
