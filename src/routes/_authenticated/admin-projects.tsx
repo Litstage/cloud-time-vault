@@ -27,7 +27,7 @@ const COLORS = [
   "#06b6d4", "#3b82f6", "#6366f1", "#a855f7", "#ec4899",
 ];
 
-type Client = { id: string; name: string; note: string | null };
+type Client = { id: string; name: string; note: string | null; hourly_rate: number };
 type Project = {
   id: string;
   name: string;
@@ -105,10 +105,13 @@ function AdminProjectsPage() {
     enabled: !!adminQ.data?.isAdmin,
     queryFn: async (): Promise<Client[]> => {
       const { data, error } = await (supabase.from("clients" as any) as any)
-        .select("id, name, note")
+        .select("id, name, note, hourly_rate")
         .order("name");
       if (error) throw error;
-      return (data ?? []) as Client[];
+      return ((data ?? []) as any[]).map((c) => ({
+        id: c.id, name: c.name, note: c.note,
+        hourly_rate: Number(c.hourly_rate ?? 0),
+      })) as Client[];
     },
   });
 
@@ -128,30 +131,37 @@ function AdminProjectsPage() {
   // Clients
   const [newClientName, setNewClientName] = useState("");
   const [newClientNote, setNewClientNote] = useState("");
+  const [newClientRate, setNewClientRate] = useState("");
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [editClientName, setEditClientName] = useState("");
   const [editClientNote, setEditClientNote] = useState("");
+  const [editClientRate, setEditClientRate] = useState("");
 
   const addClient = useMutation({
-    mutationFn: async (v: { name: string; note: string }) => {
+    mutationFn: async (v: { name: string; note: string; rate: string }) => {
+      const rate = v.rate.trim() === "" ? 0 : Number(v.rate.replace(",", "."));
+      if (!Number.isFinite(rate) || rate < 0) throw new Error("Ogiltig timdebitering");
       const { error } = await (supabase.from("clients" as any) as any).insert({
         name: v.name.trim(),
         note: v.note.trim() || null,
+        hourly_rate: rate,
       });
       if (error) throw new Error(error.message);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["clients"] });
-      setNewClientName(""); setNewClientNote("");
+      setNewClientName(""); setNewClientNote(""); setNewClientRate("");
       toast.success("Kund tillagd");
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const updateClient = useMutation({
-    mutationFn: async (v: { id: string; name: string; note: string }) => {
+    mutationFn: async (v: { id: string; name: string; note: string; rate: string }) => {
+      const rate = v.rate.trim() === "" ? 0 : Number(v.rate.replace(",", "."));
+      if (!Number.isFinite(rate) || rate < 0) throw new Error("Ogiltig timdebitering");
       const { error } = await (supabase.from("clients" as any) as any)
-        .update({ name: v.name.trim(), note: v.note.trim() || null })
+        .update({ name: v.name.trim(), note: v.note.trim() || null, hourly_rate: rate })
         .eq("id", v.id);
       if (error) throw new Error(error.message);
     },
@@ -274,6 +284,7 @@ function AdminProjectsPage() {
     setEditingClient(c);
     setEditClientName(c.name);
     setEditClientNote(c.note ?? "");
+    setEditClientRate(c.hourly_rate ? String(c.hourly_rate) : "");
   }
 
   return (
@@ -301,15 +312,21 @@ function AdminProjectsPage() {
                 Kunder ({clientsQ.data?.length ?? 0})
               </h2>
               <Card className="space-y-3 p-4">
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                   <Input placeholder="Kundnamn" value={newClientName} onChange={(e) => setNewClientName(e.target.value)} />
                   <Input placeholder="Anteckning (valfritt)" value={newClientNote} onChange={(e) => setNewClientNote(e.target.value)} />
+                  <Input
+                    placeholder="Timdebitering (kr/h)"
+                    inputMode="decimal"
+                    value={newClientRate}
+                    onChange={(e) => setNewClientRate(e.target.value)}
+                  />
                 </div>
                 <div className="flex justify-end">
                   <Button
                     size="sm"
                     disabled={!newClientName.trim() || addClient.isPending}
-                    onClick={() => addClient.mutate({ name: newClientName, note: newClientNote })}
+                    onClick={() => addClient.mutate({ name: newClientName, note: newClientNote, rate: newClientRate })}
                   >
                     <Plus className="mr-1 h-4 w-4" /> Lägg till kund
                   </Button>
@@ -325,7 +342,8 @@ function AdminProjectsPage() {
                         <>
                           <Input className="h-8 flex-1 min-w-[140px]" value={editClientName} onChange={(e) => setEditClientName(e.target.value)} />
                           <Input className="h-8 flex-1 min-w-[140px]" value={editClientNote} onChange={(e) => setEditClientNote(e.target.value)} placeholder="Anteckning" />
-                          <Button size="sm" onClick={() => updateClient.mutate({ id: c.id, name: editClientName, note: editClientNote })} disabled={updateClient.isPending}>
+                          <Input className="h-8 w-32" value={editClientRate} onChange={(e) => setEditClientRate(e.target.value)} placeholder="kr/h" inputMode="decimal" />
+                          <Button size="sm" onClick={() => updateClient.mutate({ id: c.id, name: editClientName, note: editClientNote, rate: editClientRate })} disabled={updateClient.isPending}>
                             <Save className="mr-1 h-4 w-4" /> Spara
                           </Button>
                           <Button size="sm" variant="ghost" onClick={() => setEditingClient(null)}>
@@ -336,7 +354,10 @@ function AdminProjectsPage() {
                         <>
                           <div className="min-w-0 flex-1">
                             <div className="text-sm font-medium">{c.name}</div>
-                            {c.note && <div className="text-xs text-muted-foreground">{c.note}</div>}
+                            <div className="text-xs text-muted-foreground">
+                              {c.hourly_rate > 0 ? `${c.hourly_rate.toLocaleString("sv-SE")} kr/h` : "Ingen timdebitering"}
+                              {c.note ? ` · ${c.note}` : ""}
+                            </div>
                           </div>
                           <Button size="icon" variant="ghost" onClick={() => startEditClient(c)} title="Redigera">
                             <Pencil className="h-4 w-4" />

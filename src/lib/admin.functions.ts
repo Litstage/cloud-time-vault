@@ -543,6 +543,7 @@ export type SummaryRow = {
   ob2Ms?: number;
   ob3Ms?: number;
   amount?: number;
+  billing?: number;
 };
 
 export type SummaryResult = {
@@ -553,6 +554,7 @@ export type SummaryResult = {
   totalOb2Ms: number;
   totalOb3Ms: number;
   totalAmount: number;
+  totalBilling: number;
   perClient: SummaryRow[];
   perProject: SummaryRow[];
   perUser: SummaryRow[];
@@ -622,7 +624,7 @@ export const getSummary = createServerFn({ method: "GET" })
 
     let q = supabaseAdmin
       .from("time_entries")
-      .select("id, user_id, start_time, end_time, project_id, projects(id, name, color, client_id, client, clients(id, name))")
+      .select("id, user_id, start_time, end_time, project_id, projects(id, name, color, client_id, client, clients(id, name, hourly_rate))")
       .gte("start_time", fromIso)
       .lt("start_time", toIso)
       .not("end_time", "is", null)
@@ -675,12 +677,13 @@ export const getSummary = createServerFn({ method: "GET" })
       });
     }
     const emptySplit = (): ObSplit => ({ normalMs: 0, ob1Ms: 0, ob2Ms: 0, ob3Ms: 0 });
-    const addInto = (row: SummaryRow, s: ObSplit, amount: number) => {
+    const addInto = (row: SummaryRow, s: ObSplit, amount: number, billing: number) => {
       row.normalMs = (row.normalMs ?? 0) + s.normalMs;
       row.ob1Ms = (row.ob1Ms ?? 0) + s.ob1Ms;
       row.ob2Ms = (row.ob2Ms ?? 0) + s.ob2Ms;
       row.ob3Ms = (row.ob3Ms ?? 0) + s.ob3Ms;
       row.amount = (row.amount ?? 0) + amount;
+      row.billing = (row.billing ?? 0) + billing;
     };
 
     const perClient = new Map<string, SummaryRow>();
@@ -690,6 +693,7 @@ export const getSummary = createServerFn({ method: "GET" })
     let totalCount = 0;
     const totalSplit = emptySplit();
     let totalAmount = 0;
+    let totalBilling = 0;
 
     for (const r of filtered as any[]) {
       const ms = new Date(r.end_time).getTime() - new Date(r.start_time).getTime();
@@ -707,35 +711,38 @@ export const getSummary = createServerFn({ method: "GET" })
 
       const proj = r.projects ?? null;
       const clientObj = proj?.clients ?? null;
+      const clientRate = Number(clientObj?.hourly_rate ?? 0);
+      const billing = (ms / 3600000) * clientRate;
+      totalBilling += billing;
       const clientKey = clientObj?.id ?? proj?.client ?? "__none__";
       const clientLabel = clientObj?.name ?? proj?.client ?? "Ingen kund";
       const pc = perClient.get(clientKey);
-      if (pc) { pc.ms += ms; pc.count += 1; addInto(pc, split, amount); }
+      if (pc) { pc.ms += ms; pc.count += 1; addInto(pc, split, amount, billing); }
       else {
         const row: SummaryRow = { key: clientKey, label: clientLabel, ms, count: 1 };
-        addInto(row, split, amount);
+        addInto(row, split, amount, billing);
         perClient.set(clientKey, row);
       }
 
       const projKey = proj?.id ?? "__none__";
       const projLabel = proj?.name ?? "Inget projekt";
       const pp = perProject.get(projKey);
-      if (pp) { pp.ms += ms; pp.count += 1; addInto(pp, split, amount); }
+      if (pp) { pp.ms += ms; pp.count += 1; addInto(pp, split, amount, billing); }
       else {
         const row: SummaryRow = {
           key: projKey, label: projLabel, sublabel: clientLabel,
           color: proj?.color ?? null, ms, count: 1,
         };
-        addInto(row, split, amount);
+        addInto(row, split, amount, billing);
         perProject.set(projKey, row);
       }
 
       const uid = r.user_id as string;
       const pu = perUser.get(uid);
-      if (pu) { pu.ms += ms; pu.count += 1; addInto(pu, split, amount); }
+      if (pu) { pu.ms += ms; pu.count += 1; addInto(pu, split, amount, billing); }
       else {
         const row: SummaryRow = { key: uid, label: emails.get(uid) ?? uid, ms, count: 1 };
-        addInto(row, split, amount);
+        addInto(row, split, amount, billing);
         perUser.set(uid, row);
       }
     }
@@ -749,6 +756,7 @@ export const getSummary = createServerFn({ method: "GET" })
       totalOb2Ms: totalSplit.ob2Ms,
       totalOb3Ms: totalSplit.ob3Ms,
       totalAmount,
+      totalBilling,
       perClient: Array.from(perClient.values()).sort(sortDesc),
       perProject: Array.from(perProject.values()).sort(sortDesc),
       perUser: Array.from(perUser.values()).sort(sortDesc),
