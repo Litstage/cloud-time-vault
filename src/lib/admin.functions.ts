@@ -22,6 +22,19 @@ export type ManagedUser = {
   is_admin: boolean;
 };
 
+export type AuditLogEntry = {
+  id: string;
+  entry_id: string | null;
+  entry_user_id: string | null;
+  entry_user_email: string | null;
+  action: "create" | "update" | "delete";
+  changed_by: string;
+  changed_by_email: string | null;
+  before_data: Record<string, unknown> | null;
+  after_data: Record<string, unknown> | null;
+  created_at: string;
+};
+
 async function assertAdmin(context: { supabase: any; userId: string }) {
   const { data, error } = await context.supabase.rpc("has_role", {
     _user_id: context.userId,
@@ -355,14 +368,26 @@ export const adminCreateTimeEntry = createServerFn({ method: "POST" })
     await assertAdmin(context);
     const { start, end } = computeIsoTimes(data.date, data.start, data.end);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await supabaseAdmin.from("time_entries").insert({
+    const payload = {
       user_id: data.userId,
       project_id: data.projectId,
       description: data.description,
       start_time: start,
       end_time: end,
-    });
+    };
+    const { data: inserted, error } = await supabaseAdmin
+      .from("time_entries")
+      .insert(payload)
+      .select("id")
+      .single();
     if (error) throw new Error(error.message);
+    await logAudit(supabaseAdmin, context, {
+      entry_id: inserted?.id ?? null,
+      entry_user_id: data.userId,
+      action: "create",
+      before_data: null,
+      after_data: payload,
+    });
     return { ok: true };
   });
 
@@ -382,16 +407,29 @@ export const adminUpdateTimeEntry = createServerFn({ method: "POST" })
     await assertAdmin(context);
     const { start, end } = computeIsoTimes(data.date, data.start, data.end);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: before } = await supabaseAdmin
+      .from("time_entries")
+      .select("user_id, project_id, description, start_time, end_time")
+      .eq("id", data.id)
+      .maybeSingle();
+    const after = {
+      project_id: data.projectId,
+      description: data.description,
+      start_time: start,
+      end_time: end,
+    };
     const { error } = await supabaseAdmin
       .from("time_entries")
-      .update({
-        project_id: data.projectId,
-        description: data.description,
-        start_time: start,
-        end_time: end,
-      })
+      .update(after)
       .eq("id", data.id);
     if (error) throw new Error(error.message);
+    await logAudit(supabaseAdmin, context, {
+      entry_id: data.id,
+      entry_user_id: (before?.user_id as string | undefined) ?? null,
+      action: "update",
+      before_data: before ?? null,
+      after_data: after,
+    });
     return { ok: true };
   });
 
@@ -401,7 +439,83 @@ export const adminDeleteTimeEntry = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: before } = await supabaseAdmin
+      .from("time_entries")
+      .select("user_id, project_id, description, start_time, end_time")
+      .eq("id", data.id)
+      .maybeSingle();
     const { error } = await supabaseAdmin.from("time_entries").delete().eq("id", data.id);
     if (error) throw new Error(error.message);
+    await logAudit(supabaseAdmin, context, {
+      entry_id: data.id,
+      entry_user_id: (before?.user_id as string | undefined) ?? null,
+      action: "delete",
+      before_data: before ?? null,
+      after_data: null,
+    });
     return { ok: true };
+  });
+
+async function logAudit(
+  supabaseAdmin: any,
+  context: { userId: string; claims?: any },
+  payload: {
+    entry_id: string | null;
+    entry_user_id: string | null;
+    action: "create" | "update" | "delete";
+    before_data: Record<string, unknown> | null;
+    after_data: Record<string, unknown> | null;
+  },
+) {
+  const changedByEmail =
+    (context.claims?.email as string | undefined) ?? null;
+  await supabaseAdmin.from("time_entry_audit").insert({
+    entry_id: payload.entry_id,
+    entry_user_id: payload.entry_user_id,
+    action: payload.action,
+    changed_by: context.userId,
+    changed_by_email: changedByEmail,
+    before_data: payload.before_data,
+    after_data: payload.after_data,
+  });
+}
+
+export const getAuditLog = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { limit?: number } | undefined) => d ?? {})
+  .handler(async ({ data, context }): Promise<AuditLogEntry[]> => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: rows, error } = await supabaseAdmin
+      .from("time_entry_audit")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(Math.min(data.limit ?? 500, 2000));
+    if (error) throw new Error(error.message);
+
+    const emails = new Map<string, string | null>();
+    let page = 1;
+    while (page < 20) {
+      const { data: usersPage, error: uErr } = await supabaseAdmin.auth.admin.listUsers({
+        page,
+        perPage: 1000,
+      });
+      if (uErr) throw new Error(uErr.message);
+      for (const u of usersPage.users) emails.set(u.id, u.email ?? null);
+      if (usersPage.users.length < 1000) break;
+      page += 1;
+    }
+
+    return (rows ?? []).map((r: any) => ({
+      id: r.id,
+      entry_id: r.entry_id,
+      entry_user_id: r.entry_user_id,
+      entry_user_email: r.entry_user_id ? emails.get(r.entry_user_id) ?? null : null,
+      action: r.action,
+      changed_by: r.changed_by,
+      changed_by_email: r.changed_by_email ?? emails.get(r.changed_by) ?? null,
+      before_data: r.before_data,
+      after_data: r.after_data,
+      created_at: r.created_at,
+    }));
   });
