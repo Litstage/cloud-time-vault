@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { splitEntryByOb, computePay, type ObRule, type ObSplit, type Wage } from "@/lib/ob";
 
 export type AdminEntry = {
   id: string;
@@ -537,15 +538,75 @@ export type SummaryRow = {
   color?: string | null;
   ms: number;
   count: number;
+  normalMs?: number;
+  ob1Ms?: number;
+  ob2Ms?: number;
+  ob3Ms?: number;
+  amount?: number;
 };
 
 export type SummaryResult = {
   totalMs: number;
   totalCount: number;
+  totalNormalMs: number;
+  totalOb1Ms: number;
+  totalOb2Ms: number;
+  totalOb3Ms: number;
+  totalAmount: number;
   perClient: SummaryRow[];
   perProject: SummaryRow[];
   perUser: SummaryRow[];
 };
+
+export type UserWage = {
+  user_id: string;
+  hourly_rate: number;
+  ob1_pct: number;
+  ob2_pct: number;
+  ob3_pct: number;
+};
+
+export const getUserWage = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { userId: string }) => d)
+  .handler(async ({ data, context }): Promise<UserWage> => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: row, error } = await supabaseAdmin
+      .from("user_wages" as any)
+      .select("*")
+      .eq("user_id", data.userId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    const r = row as any;
+    return {
+      user_id: data.userId,
+      hourly_rate: Number(r?.hourly_rate ?? 0),
+      ob1_pct: Number(r?.ob1_pct ?? 0),
+      ob2_pct: Number(r?.ob2_pct ?? 0),
+      ob3_pct: Number(r?.ob3_pct ?? 0),
+    };
+  });
+
+export const upsertUserWage = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: UserWage) => d)
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await (supabaseAdmin.from("user_wages" as any) as any).upsert(
+      {
+        user_id: data.userId,
+        hourly_rate: data.hourly_rate,
+        ob1_pct: data.ob1_pct,
+        ob2_pct: data.ob2_pct,
+        ob3_pct: data.ob3_pct,
+      },
+      { onConflict: "user_id" },
+    );
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
 
 export const getSummary = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
