@@ -441,12 +441,35 @@ function ManualEntryDialog({ open, onOpenChange, projects }: { open: boolean; on
 
   const dateValid = /^\d{4}-\d{2}-\d{2}$/.test(dateText) && !isNaN(new Date(dateText).getTime());
 
+  function normalizeTime(v: string): string | null {
+    const t = v.trim().replace(/[.,]/g, ":");
+    let m = /^(\d{1,2}):(\d{2})$/.exec(t);
+    if (!m) {
+      const d = /^(\d{3,4})$/.exec(t);
+      if (d) {
+        const s = d[1].padStart(4, "0");
+        m = [s, s.slice(0, 2), s.slice(2)] as RegExpExecArray;
+      }
+    }
+    if (!m) return null;
+    const h = Number(m[1]);
+    const mi = Number(m[2]);
+    if (h < 0 || h > 23 || mi < 0 || mi > 59) return null;
+    return `${String(h).padStart(2, "0")}:${String(mi).padStart(2, "0")}`;
+  }
+
+  const startNorm = normalizeTime(start);
+  const endNorm = normalizeTime(end);
+
   async function save() {
+    if (!dateValid) return toast.error("Ogiltigt datum");
+    if (!startNorm) return toast.error("Ogiltig starttid");
+    if (!endNorm) return toast.error("Ogiltig sluttid");
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) return;
     const isoDay = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-    const startIso = new Date(`${isoDay}T${start}`).toISOString();
-    let endDate = new Date(`${isoDay}T${end}`);
+    const startIso = new Date(`${isoDay}T${startNorm}`).toISOString();
+    let endDate = new Date(`${isoDay}T${endNorm}`);
     if (endDate.getTime() <= new Date(startIso).getTime()) {
       endDate = new Date(endDate.getTime() + 24 * 3600 * 1000);
     }
@@ -501,11 +524,25 @@ function ManualEntryDialog({ open, onOpenChange, projects }: { open: boolean; on
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label className="text-base">Start</Label>
-              <Input type="time" value={start} onChange={(e) => setStart(e.target.value)} className="h-12 text-base w-full min-w-0" />
+              <Input
+                type="text"
+                inputMode="numeric"
+                placeholder="HH:MM"
+                value={start}
+                onChange={(e) => setStart(e.target.value)}
+                className={cn("h-12 text-base w-full min-w-0", !startNorm && "border-destructive")}
+              />
             </div>
             <div className="space-y-2">
               <Label className="text-base">Slut</Label>
-              <Input type="time" value={end} onChange={(e) => setEnd(e.target.value)} className="h-12 text-base w-full min-w-0" />
+              <Input
+                type="text"
+                inputMode="numeric"
+                placeholder="HH:MM"
+                value={end}
+                onChange={(e) => setEnd(e.target.value)}
+                className={cn("h-12 text-base w-full min-w-0", !endNorm && "border-destructive")}
+              />
             </div>
           </div>
           <div className="space-y-2">
