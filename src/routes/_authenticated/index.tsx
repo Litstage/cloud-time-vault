@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,7 +15,7 @@ import {
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Play, Square, Plus, Download, LogOut, FolderKanban, Trash2, MoreVertical } from "lucide-react";
+import { Play, Square, Plus, Download, LogOut, FolderKanban, Trash2, MoreVertical, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/")({
@@ -175,6 +175,9 @@ function HomePage() {
               <Button variant="ghost" size="icon"><MoreVertical className="h-5 w-5" /></Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <DropdownMenuItem asChild>
+                <Link to="/overview"><BarChart3 className="mr-2 h-4 w-4" /> Månadsöversikt</Link>
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setProjectsOpen(true)}>
                 <FolderKanban className="mr-2 h-4 w-4" /> Projekt
               </DropdownMenuItem>
