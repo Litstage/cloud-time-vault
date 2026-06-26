@@ -596,7 +596,7 @@ export const upsertUserWage = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await (supabaseAdmin.from("user_wages" as any) as any).upsert(
       {
-        user_id: data.userId,
+        user_id: data.user_id,
         hourly_rate: data.hourly_rate,
         ob1_pct: data.ob1_pct,
         ob2_pct: data.ob2_pct,
@@ -657,54 +657,98 @@ export const getSummary = createServerFn({ method: "GET" })
       }
     }
 
+    // Load OB rules + wages for the involved users
+    const [{ data: ruleRows }, { data: wageRows }] = await Promise.all([
+      (supabaseAdmin.from("ob_rules" as any) as any).select("*").eq("active", true),
+      (supabaseAdmin.from("user_wages" as any) as any)
+        .select("*")
+        .in("user_id", Array.from(userIds)),
+    ]);
+    const rules = ((ruleRows as any[]) ?? []) as ObRule[];
+    const wages = new Map<string, Wage>();
+    for (const w of ((wageRows as any[]) ?? [])) {
+      wages.set(w.user_id as string, {
+        hourly_rate: Number(w.hourly_rate ?? 0),
+        ob1_pct: Number(w.ob1_pct ?? 0),
+        ob2_pct: Number(w.ob2_pct ?? 0),
+        ob3_pct: Number(w.ob3_pct ?? 0),
+      });
+    }
+    const emptySplit = (): ObSplit => ({ normalMs: 0, ob1Ms: 0, ob2Ms: 0, ob3Ms: 0 });
+    const addInto = (row: SummaryRow, s: ObSplit, amount: number) => {
+      row.normalMs = (row.normalMs ?? 0) + s.normalMs;
+      row.ob1Ms = (row.ob1Ms ?? 0) + s.ob1Ms;
+      row.ob2Ms = (row.ob2Ms ?? 0) + s.ob2Ms;
+      row.ob3Ms = (row.ob3Ms ?? 0) + s.ob3Ms;
+      row.amount = (row.amount ?? 0) + amount;
+    };
+
     const perClient = new Map<string, SummaryRow>();
     const perProject = new Map<string, SummaryRow>();
     const perUser = new Map<string, SummaryRow>();
     let totalMs = 0;
     let totalCount = 0;
+    const totalSplit = emptySplit();
+    let totalAmount = 0;
 
     for (const r of filtered as any[]) {
       const ms = new Date(r.end_time).getTime() - new Date(r.start_time).getTime();
       if (ms <= 0) continue;
       totalMs += ms;
       totalCount += 1;
+      const split = splitEntryByOb(r.start_time as string, r.end_time as string, rules);
+      const wage = wages.get(r.user_id as string) ?? { hourly_rate: 0, ob1_pct: 0, ob2_pct: 0, ob3_pct: 0 };
+      const amount = computePay(split, wage);
+      totalSplit.normalMs += split.normalMs;
+      totalSplit.ob1Ms += split.ob1Ms;
+      totalSplit.ob2Ms += split.ob2Ms;
+      totalSplit.ob3Ms += split.ob3Ms;
+      totalAmount += amount;
 
       const proj = r.projects ?? null;
       const clientObj = proj?.clients ?? null;
       const clientKey = clientObj?.id ?? proj?.client ?? "__none__";
       const clientLabel = clientObj?.name ?? proj?.client ?? "Ingen kund";
       const pc = perClient.get(clientKey);
-      if (pc) { pc.ms += ms; pc.count += 1; }
-      else perClient.set(clientKey, { key: clientKey, label: clientLabel, ms, count: 1 });
+      if (pc) { pc.ms += ms; pc.count += 1; addInto(pc, split, amount); }
+      else {
+        const row: SummaryRow = { key: clientKey, label: clientLabel, ms, count: 1 };
+        addInto(row, split, amount);
+        perClient.set(clientKey, row);
+      }
 
       const projKey = proj?.id ?? "__none__";
       const projLabel = proj?.name ?? "Inget projekt";
       const pp = perProject.get(projKey);
-      if (pp) { pp.ms += ms; pp.count += 1; }
-      else perProject.set(projKey, {
-        key: projKey,
-        label: projLabel,
-        sublabel: clientLabel,
-        color: proj?.color ?? null,
-        ms,
-        count: 1,
-      });
+      if (pp) { pp.ms += ms; pp.count += 1; addInto(pp, split, amount); }
+      else {
+        const row: SummaryRow = {
+          key: projKey, label: projLabel, sublabel: clientLabel,
+          color: proj?.color ?? null, ms, count: 1,
+        };
+        addInto(row, split, amount);
+        perProject.set(projKey, row);
+      }
 
       const uid = r.user_id as string;
       const pu = perUser.get(uid);
-      if (pu) { pu.ms += ms; pu.count += 1; }
-      else perUser.set(uid, {
-        key: uid,
-        label: emails.get(uid) ?? uid,
-        ms,
-        count: 1,
-      });
+      if (pu) { pu.ms += ms; pu.count += 1; addInto(pu, split, amount); }
+      else {
+        const row: SummaryRow = { key: uid, label: emails.get(uid) ?? uid, ms, count: 1 };
+        addInto(row, split, amount);
+        perUser.set(uid, row);
+      }
     }
 
     const sortDesc = (a: SummaryRow, b: SummaryRow) => b.ms - a.ms;
     return {
       totalMs,
       totalCount,
+      totalNormalMs: totalSplit.normalMs,
+      totalOb1Ms: totalSplit.ob1Ms,
+      totalOb2Ms: totalSplit.ob2Ms,
+      totalOb3Ms: totalSplit.ob3Ms,
+      totalAmount,
       perClient: Array.from(perClient.values()).sort(sortDesc),
       perProject: Array.from(perProject.values()).sort(sortDesc),
       perUser: Array.from(perUser.values()).sort(sortDesc),
