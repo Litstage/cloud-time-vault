@@ -19,7 +19,7 @@ import {
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Play, Square, Plus, Download, LogOut, FolderKanban, Trash2, MoreVertical, BarChart3, ShieldCheck, CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react";
+import { Play, Square, Plus, Download, LogOut, FolderKanban, Trash2, MoreVertical, BarChart3, ShieldCheck, CalendarIcon, ChevronLeft, ChevronRight, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { ApprovalGate } from "@/components/approval-gate";
 import { isAdmin as isAdminFn } from "@/lib/admin.functions";
@@ -530,25 +530,11 @@ function ManualEntryDialog({ open, onOpenChange, projects }: { open: boolean; on
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label className="text-base">Start</Label>
-              <Input
-                type="text"
-                inputMode="numeric"
-                placeholder="HH:MM"
-                value={start}
-                onChange={(e) => setStart(e.target.value)}
-                className={cn("h-12 text-base w-full min-w-0", !startNorm && "border-destructive")}
-              />
+              <TimeField value={start} onChange={setStart} valid={!!startNorm} />
             </div>
             <div className="space-y-2">
               <Label className="text-base">Slut</Label>
-              <Input
-                type="text"
-                inputMode="numeric"
-                placeholder="HH:MM"
-                value={end}
-                onChange={(e) => setEnd(e.target.value)}
-                className={cn("h-12 text-base w-full min-w-0", !endNorm && "border-destructive")}
-              />
+              <TimeField value={end} onChange={setEnd} valid={!!endNorm} />
             </div>
           </div>
           <div className="space-y-2">
