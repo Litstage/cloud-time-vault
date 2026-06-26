@@ -389,6 +389,16 @@ function AdminProjectsPage() {
                     />
                   ))}
                 </div>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Startdatum</Label>
+                    <DateField value={newProjStart} onChange={setNewProjStart} valid={isValidYmdOrEmpty(newProjStart)} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Slutdatum</Label>
+                    <DateField value={newProjEnd} onChange={setNewProjEnd} valid={isValidYmdOrEmpty(newProjEnd)} />
+                  </div>
+                </div>
                 <div className="flex justify-end">
                   <Button size="sm" disabled={!newProjName.trim() || addProject.isPending} onClick={() => addProject.mutate()}>
                     <Plus className="mr-1 h-4 w-4" /> Lägg till projekt
@@ -430,6 +440,16 @@ function AdminProjectsPage() {
                                 />
                               ))}
                             </div>
+                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                              <div className="space-y-1">
+                                <Label className="text-xs">Startdatum</Label>
+                                <DateField value={editProjStart} onChange={setEditProjStart} valid={isValidYmdOrEmpty(editProjStart)} />
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-xs">Slutdatum</Label>
+                                <DateField value={editProjEnd} onChange={setEditProjEnd} valid={isValidYmdOrEmpty(editProjEnd)} />
+                              </div>
+                            </div>
                             <div className="flex justify-end gap-2">
                               <Button size="sm" variant="ghost" onClick={() => setEditingProj(null)}>Avbryt</Button>
                               <Button size="sm" onClick={() => updateProject.mutate()} disabled={updateProject.isPending}>
@@ -442,7 +462,9 @@ function AdminProjectsPage() {
                             <div className="h-3 w-3 rounded-full" style={{ background: p.color }} />
                             <div className="min-w-0 flex-1">
                               <div className="text-sm font-medium">{p.name}</div>
-                              <div className="text-xs text-muted-foreground">{clientName ?? "Ingen kund"}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {clientName ?? "Ingen kund"} · {fmtRange(p.start_date, p.end_date)}
+                              </div>
                             </div>
                             <Button size="icon" variant="ghost" onClick={() => startEditProject(p)} title="Redigera">
                               <Pencil className="h-4 w-4" />
