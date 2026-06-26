@@ -1,8 +1,8 @@
-## Ändring
-Sätt svensk locale som default i `src/components/ui/calendar.tsx`:
+Öka storleken på "Lägg till tid"-dialogen så den känns rymligare på desktop/tablet.
 
-- Importera `sv` från `date-fns/locale`.
-- Lägg till `locale = sv` som default-prop och vidarebefordra till `<DayPicker>`.
-- Ta bort den hårdkodade `toLocaleString("default", { month: "short" })` i `formatMonthDropdown` så att react-day-picker själv formaterar månadsnamn enligt locale.
+## Ändringar
+- I `src/routes/_authenticated/index.tsx`, på `<DialogContent>` för `ManualEntryDialog`: byt nuvarande bredd till `sm:max-w-lg` (eller `max-w-xl`) och öka inre padding/spacing (`p-6`, `gap-5`).
+- Öka input-höjder till `h-12` och textstorlek till `text-base` för fälten Datum, Start, Slut, Projekt, Beskrivning.
+- Större titel (`text-xl`) och något större knappar i footern.
 
-Påverkar alla kalendrar i appen – veckodagar visas som må/ti/on/to/fr/lö/sö och månadsnamn på svenska. `date-fns` finns redan i projektet (används av shadcn-komponenterna).
+Ingen ändring av logik eller datafält.
