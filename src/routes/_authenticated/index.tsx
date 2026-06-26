@@ -386,8 +386,11 @@ function ManualEntryDialog({ open, onOpenChange, projects }: { open: boolean; on
     if (!u.user) return;
     const isoDay = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
     const startIso = new Date(`${isoDay}T${start}`).toISOString();
-    const endIso = new Date(`${isoDay}T${end}`).toISOString();
-    if (new Date(endIso) <= new Date(startIso)) return toast.error("Sluttid måste vara efter starttid");
+    let endDate = new Date(`${isoDay}T${end}`);
+    if (endDate.getTime() <= new Date(startIso).getTime()) {
+      endDate = new Date(endDate.getTime() + 24 * 3600 * 1000);
+    }
+    const endIso = endDate.toISOString();
     const { error } = await supabase.from("time_entries").insert({
       user_id: u.user.id,
       description: description || null,
