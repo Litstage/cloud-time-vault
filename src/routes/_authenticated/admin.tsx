@@ -751,6 +751,27 @@ function AdminPage() {
                   placeholder="Minst 6 tecken"
                 />
               </div>
+              <div className="rounded-md border p-3">
+                <div className="mb-2 text-xs font-medium uppercase text-muted-foreground">Lön & OB</div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Timlön (kr)</Label>
+                    <Input type="number" step="0.01" value={editHourly} onChange={(e) => setEditHourly(e.target.value)} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">OB1 (% påslag)</Label>
+                    <Input type="number" step="0.01" value={editOb1} onChange={(e) => setEditOb1(e.target.value)} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">OB2 (% påslag)</Label>
+                    <Input type="number" step="0.01" value={editOb2} onChange={(e) => setEditOb2(e.target.value)} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">OB3 (% påslag)</Label>
+                    <Input type="number" step="0.01" value={editOb3} onChange={(e) => setEditOb3(e.target.value)} />
+                  </div>
+                </div>
+              </div>
             </div>
           )}
           <DialogFooter>
@@ -771,6 +792,14 @@ function AdminPage() {
                   payload.phone = editPhone;
                 }
                 if (editPassword) payload.password = editPassword;
+                // Save wage in parallel (always — admin may have changed only wages)
+                wageMut.mutate({
+                  user_id: editing.user_id,
+                  hourly_rate: Number(editHourly) || 0,
+                  ob1_pct: Number(editOb1) || 0,
+                  ob2_pct: Number(editOb2) || 0,
+                  ob3_pct: Number(editOb3) || 0,
+                });
                 updateMut.mutate(payload);
               }}
             >
