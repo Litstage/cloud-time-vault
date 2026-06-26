@@ -290,15 +290,29 @@ function HomePage() {
 
         {/* Entries */}
         <section className="space-y-4">
-          <div className="flex items-center justify-between gap-2">
-            <h2 className="text-sm font-medium text-muted-foreground">Poster för dagen</h2>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-medium text-muted-foreground">Poster</h2>
+              <Select value={range} onValueChange={(v) => setRange(v as "day" | "week" | "month")}>
+                <SelectTrigger className="h-8 w-[110px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="day">Dag</SelectItem>
+                  <SelectItem value="week">Vecka</SelectItem>
+                  <SelectItem value="month">Månad</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div className="flex items-center gap-1">
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => {
                   const d = new Date(filterDate);
-                  d.setDate(d.getDate() - 1);
+                  if (range === "day") d.setDate(d.getDate() - 1);
+                  else if (range === "week") d.setDate(d.getDate() - 7);
+                  else d.setMonth(d.getMonth() - 1);
                   setFilterDate(d);
                 }}
               >
@@ -308,7 +322,11 @@ function HomePage() {
                 <PopoverTrigger asChild>
                   <Button variant="outline" size="sm" className="font-normal">
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {filterDate.toLocaleDateString("sv-SE", { weekday: "short", day: "numeric", month: "short" })}
+                    {range === "day"
+                      ? filterDate.toLocaleDateString("sv-SE", { weekday: "short", day: "numeric", month: "short" })
+                      : range === "month"
+                      ? filterDate.toLocaleDateString("sv-SE", { month: "long", year: "numeric" })
+                      : `v.${getIsoWeek(filterDate)}`}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="end">
@@ -326,7 +344,9 @@ function HomePage() {
                 size="icon"
                 onClick={() => {
                   const d = new Date(filterDate);
-                  d.setDate(d.getDate() + 1);
+                  if (range === "day") d.setDate(d.getDate() + 1);
+                  else if (range === "week") d.setDate(d.getDate() + 7);
+                  else d.setMonth(d.getMonth() + 1);
                   setFilterDate(d);
                 }}
               >
@@ -338,7 +358,7 @@ function HomePage() {
             <Card className="p-8 text-center text-sm text-muted-foreground">Laddar…</Card>
           ) : grouped.length === 0 ? (
             <Card className="p-8 text-center text-sm text-muted-foreground">
-              Inga tidsposter denna dag.
+              Inga tidsposter i vald period.
             </Card>
           ) : (
             grouped.map(([day, list]) => (
