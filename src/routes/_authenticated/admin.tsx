@@ -53,18 +53,25 @@ function formatHours(ms: number) {
   return (ms / 3600000).toFixed(2);
 }
 
-function displayName(u: {
+type NameLike = {
   first_name?: string | null;
   last_name?: string | null;
+  user_first_name?: string | null;
+  user_last_name?: string | null;
   email?: string | null;
+  user_email?: string | null;
   user_id?: string;
-}): string {
-  const full = [u.first_name, u.last_name].filter(Boolean).join(" ").trim();
-  return full || u.email || u.user_id || "";
+};
+function displayName(u: NameLike): string {
+  const fn = u.first_name ?? u.user_first_name ?? null;
+  const ln = u.last_name ?? u.user_last_name ?? null;
+  const full = [fn, ln].filter(Boolean).join(" ").trim();
+  return full || u.email || u.user_email || u.user_id || "";
 }
-
-function hasName(u: { first_name?: string | null; last_name?: string | null }): boolean {
-  return Boolean((u.first_name && u.first_name.trim()) || (u.last_name && u.last_name.trim()));
+function hasName(u: NameLike): boolean {
+  const fn = u.first_name ?? u.user_first_name ?? null;
+  const ln = u.last_name ?? u.user_last_name ?? null;
+  return Boolean((fn && fn.trim()) || (ln && ln.trim()));
 }
 
 function StatusBadge({ status }: { status: ManagedUser["status"] }) {
