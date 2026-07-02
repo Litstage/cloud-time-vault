@@ -908,6 +908,7 @@ export const getSummary = createServerFn({ method: "GET" })
     // Collect user ids and resolve emails
     const userIds = new Set<string>(filtered.map((r: any) => r.user_id as string));
     const emails = new Map<string, string | null>();
+    const firstNames = new Map<string, string | null>();
     if (userIds.size > 0) {
       let page = 1;
       while (page < 20) {
@@ -916,7 +917,12 @@ export const getSummary = createServerFn({ method: "GET" })
           perPage: 1000,
         });
         if (uErr) throw new Error(uErr.message);
-        for (const u of usersPage.users) emails.set(u.id, u.email ?? null);
+        for (const u of usersPage.users) {
+          emails.set(u.id, u.email ?? null);
+          const md = (u.user_metadata ?? {}) as any;
+          const fn = ((md.first_name ?? "") as string).trim();
+          firstNames.set(u.id, fn || null);
+        }
         if (usersPage.users.length < 1000) break;
         page += 1;
       }
