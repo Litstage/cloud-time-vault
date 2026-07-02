@@ -770,6 +770,8 @@ export type SummaryRow = {
   ob3Ms?: number;
   amount?: number;
   billing?: number;
+  employerCost?: number;
+  net?: number;
 };
 
 export type SummaryResult = {
@@ -781,6 +783,8 @@ export type SummaryResult = {
   totalOb3Ms: number;
   totalAmount: number;
   totalBilling: number;
+  totalEmployerCost: number;
+  totalNet: number;
   perClient: SummaryRow[];
   perProject: SummaryRow[];
   perUser: SummaryRow[];
