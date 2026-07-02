@@ -678,7 +678,14 @@ function AdminPage() {
                 ) : (
                   totals.perUser.map(([uid, v]) => (
                     <div key={uid} className="flex items-center justify-between px-4 py-3">
-                      <div className="truncate text-sm">{v.email ?? uid}</div>
+                      <div className="truncate text-sm">
+                        {displayName({ ...v, user_id: uid })}
+                        {!hasName(v) && (
+                          <span className="ml-2 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300">
+                            Namn saknas
+                          </span>
+                        )}
+                      </div>
                       <div className="font-mono text-sm tabular-nums">{formatHours(v.ms)} h</div>
                     </div>
                   ))
