@@ -511,7 +511,10 @@ function AdminPage() {
   function exportCsv() {
     const header = ["Användare", "Datum", "Start", "Slut", "Timmar", "Projekt", "Beskrivning"];
     const lines = [header.join(",")];
-    const esc = (v: string) => `"${v.replace(/"/g, '""')}"`;
+    const esc = (v: string) => {
+      const safe = /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
+      return `"${safe.replace(/"/g, '""')}"`;
+    };
     for (const r of rows) {
       if (!r.end_time) continue;
       const start = new Date(r.start_time);
