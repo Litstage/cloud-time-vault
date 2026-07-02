@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { splitEntryByOb, computePay, type ObRule, type ObSplit, type Wage } from "@/lib/ob";
+import { parsePersonalNumber, employerFeePctForAge } from "@/lib/employer-fee";
 
 export type AdminEntry = {
   id: string;
@@ -919,6 +920,7 @@ export const getSummary = createServerFn({ method: "GET" })
     const rules = ((ruleRows as any[]) ?? []) as ObRule[];
     const wages = new Map<string, Wage>();
     const feeMap = new Map<string, number>();
+    const birthMap = new Map<string, Date | null>();
     const taxMap = new Map<string, number>();
     const tableNumMap = new Map<string, number>();
     const tableColMap = new Map<string, number>();
@@ -930,6 +932,7 @@ export const getSummary = createServerFn({ method: "GET" })
         ob3_pct: Number(w.ob3_pct ?? 0),
       });
       feeMap.set(w.user_id as string, Number(w.employer_fee_pct ?? 31.42));
+      birthMap.set(w.user_id as string, parsePersonalNumber(w.personal_number as string | null));
       taxMap.set(w.user_id as string, Number(w.tax_pct ?? 30));
       tableNumMap.set(w.user_id as string, Number(w.tax_table_number ?? 32));
       tableColMap.set(w.user_id as string, Number(w.tax_table_column ?? 1));
@@ -1055,7 +1058,11 @@ export const getSummary = createServerFn({ method: "GET" })
       totalCount += 1;
       const split = f.split;
       const amount = f.amount;
-      const feePct = feeMap.get(r.user_id as string) ?? 31.42;
+      const uidRow = r.user_id as string;
+      const birth = birthMap.get(uidRow) ?? null;
+      const feePct = birth
+        ? employerFeePctForAge(birth, new Date(r.start_time as string))
+        : (feeMap.get(uidRow) ?? 31.42);
       const employerCost = amount * (1 + feePct / 100);
       const netRate = netRateByUserMonth.get(`${f.userId}|${f.monthKey}`) ?? 0.7;
       const net = amount * netRate;
