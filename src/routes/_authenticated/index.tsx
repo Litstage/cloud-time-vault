@@ -310,9 +310,11 @@ function HomePage() {
               <DropdownMenuItem asChild>
                 <Link to="/overview"><BarChart3 className="mr-2 h-4 w-4" /> Månadsöversikt</Link>
               </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link to="/admin"><ShieldCheck className="mr-2 h-4 w-4" /> Admin</Link>
-              </DropdownMenuItem>
+              {userIsAdmin && (
+                <DropdownMenuItem asChild>
+                  <Link to="/admin"><ShieldCheck className="mr-2 h-4 w-4" /> Admin</Link>
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem onClick={() => setProjectsOpen(true)}>
                 <FolderKanban className="mr-2 h-4 w-4" /> Projekt
               </DropdownMenuItem>
