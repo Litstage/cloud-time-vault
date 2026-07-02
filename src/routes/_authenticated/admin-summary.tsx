@@ -23,6 +23,12 @@ export const Route = createFileRoute("/_authenticated/admin-summary")({
 });
 
 function fmtHours(ms: number) { return (ms / 3600000).toFixed(2); }
+function roundHours(ms: number) {
+  const hours = ms / 3600000;
+  const frac = hours - Math.floor(hours);
+  return frac >= 0.5 ? Math.ceil(hours) : Math.floor(hours);
+}
+function fmtRoundedHours(ms: number) { return `${roundHours(ms)}`; }
 function fmtKr(n: number) { return n.toLocaleString("sv-SE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 function firstNameOf(u: { first_name?: string | null; email?: string | null; user_id: string }) {
   const fn = (u.first_name ?? "").trim();
@@ -56,6 +62,7 @@ function AdminSummaryPage() {
   const [showBilling, setShowBilling] = useState(true);
   const [pdfBusy, setPdfBusy] = useState(false);
   const [pdfDetail, setPdfDetail] = useState<"entries" | "daily">("entries");
+  const [roundPdfHours, setRoundPdfHours] = useState(false);
 
   const usersQ = useQuery({
     queryKey: ["managed-users"],
@@ -162,6 +169,7 @@ function AdminSummaryPage() {
       const clientsMap = new Map(clientsQ.data?.map((c) => [c.id, c.name]) ?? []);
       const projectsMap = new Map(projectsQ.data?.map((p) => [p.id, p.name]) ?? []);
       const timeSuffix = (fromTime !== "00:00" || toTime !== "00:00") ? ` ${fromTime}–${toTime}` : "";
+      const fmtH = (ms: number) => roundPdfHours ? fmtRoundedHours(ms) : fmtHours(ms);
 
       doc.setFontSize(16);
       doc.text("Sammanställning", 40, 40);
@@ -172,11 +180,12 @@ function AdminSummaryPage() {
         `Kund: ${clientId === "all" ? "Alla" : (clientsMap.get(clientId) ?? clientId)}`,
         `Projekt: ${projectId === "all" ? "Alla" : (projectsMap.get(projectId) ?? projectId)}`,
       ];
+      if (roundPdfHours) filterLines.push("Tider är avrundade till närmaste heltimme.");
       doc.text(filterLines, 40, 58);
 
       const totalsRows: [string, string][] = [
-        ["Total tid", `${fmtHours(s.totalMs)} h (${s.totalCount} poster)`],
-        ["Normal / OB1 / OB2 / OB3", `${fmtHours(s.totalNormalMs)} / ${fmtHours(s.totalOb1Ms)} / ${fmtHours(s.totalOb2Ms)} / ${fmtHours(s.totalOb3Ms)} h`],
+        ["Total tid", `${fmtH(s.totalMs)} h (${s.totalCount} poster)`],
+        ["Normal / OB1 / OB2 / OB3", `${fmtH(s.totalNormalMs)} / ${fmtH(s.totalOb1Ms)} / ${fmtH(s.totalOb2Ms)} / ${fmtH(s.totalOb3Ms)} h`],
       ];
       if (showGross) totalsRows.push(["Bruttolön", `${fmtKr(s.totalAmount)} kr`]);
       if (showNet) totalsRows.push(["Netto efter skatt", `${fmtKr(s.totalNet)} kr`]);
@@ -222,11 +231,11 @@ function AdminSummaryPage() {
       };
 
       addSection("Per kund", ["Kund", "Timmar", ...costCols],
-        s.perClient.map((r) => [r.label, fmtHours(r.ms), ...rowCostCells(r)]));
+        s.perClient.map((r) => [r.label, fmtH(r.ms), ...rowCostCells(r)]));
       addSection("Per projekt", ["Projekt", "Kund", "Timmar", ...costCols],
-        s.perProject.map((r) => [r.label, r.sublabel ?? "", fmtHours(r.ms), ...rowCostCells(r)]));
+        s.perProject.map((r) => [r.label, r.sublabel ?? "", fmtH(r.ms), ...rowCostCells(r)]));
       addSection("Per användare", ["Användare", "Timmar", ...costCols],
-        s.perUser.map((r) => [r.label, fmtHours(r.ms), ...rowCostCells(r)]));
+        s.perUser.map((r) => [r.label, fmtH(r.ms), ...rowCostCells(r)]));
 
       const fmtDate = (iso: string) => new Date(iso).toLocaleDateString("sv-SE");
       const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" });
@@ -242,7 +251,7 @@ function AdminSummaryPage() {
             e.project_name ?? "",
             e.client_name ?? "",
             e.description ?? "",
-            fmtHours(e.ms),
+            fmtH(e.ms),
           ]),
         );
       } else {
@@ -261,7 +270,7 @@ function AdminSummaryPage() {
         addSection(
           `Summering per användare och dag (${rows.length})`,
           ["Datum", "Användare", "Antal poster", "Timmar"],
-          rows.map((r) => [r.date, r.user, String(r.count), fmtHours(r.ms)]),
+          rows.map((r) => [r.date, r.user, String(r.count), fmtH(r.ms)]),
         );
       }
 
@@ -377,6 +386,9 @@ function AdminSummaryPage() {
                       <CostToggle label="Netto efter skatt" checked={showNet} onChange={setShowNet} />
                       <CostToggle label="Arbetsgivarkostnad" checked={showEmployer} onChange={setShowEmployer} />
                       <CostToggle label="Debitering kund" checked={showBilling} onChange={setShowBilling} />
+                      <div className="border-t pt-2">
+                        <CostToggle label="Avrunda timmar till heltimmar i PDF" checked={roundPdfHours} onChange={setRoundPdfHours} />
+                      </div>
                       <div className="border-t pt-2">
                         <div className="mb-1 text-xs font-medium text-muted-foreground">Specifikation i PDF</div>
                         <label className="flex cursor-pointer items-center gap-2 text-sm">

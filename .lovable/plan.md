@@ -1,27 +1,28 @@
-Ändra sammanställningen så att förnamn används istället för e-post, och gör innehållet i PDF-specifikationen valbart mellan alla tidsposter eller summering per användare och dag.
+Add an optional “round to whole hours” mode for the PDF export in the admin summary page.
 
-## Ändringar
+## What to build
 
-**`src/lib/admin.functions.ts`**
-- I `getSummary`: bygg en `firstNames`-map (fallback: e-post-prefix, sen userId) och använd den som `label` för `perUser`-raderna istället för e-post.
-- I `getSummaryEntries`: sätt `user_label` till enbart förnamn (fallback: e-post-prefix före `@`, sen userId). Inga efternamn, inga e-postadresser.
+1. **Rounding helper in `src/routes/_authenticated/admin-summary.tsx`**
+   - `roundHours(ms: number): number` – converts ms to hours, then rounds to nearest whole hour using half-up rules (≥ 0.5 rounds up, < 0.5 rounds down).
+   - Display helper `fmtRoundedHours(ms: number): string` that returns the rounded hour count as a plain integer string, e.g. "3 h".
 
-**`src/routes/_authenticated/admin-summary.tsx`**
-- Användarfiltret (Select): visa förnamn istället för e-post. Lägg till en hjälpare som hämtar förnamn från `usersQ.data` (fallback e-post-prefix).
-- Lägg till ny state `pdfDetail: "entries" | "daily"` (default `"entries"`, sparas inte mellan sessioner).
-- Popover-menyn "Visa kostnader" byggs ut med en radiogrupp "Specifikation i PDF":
-  - "Alla tidsposter" (nuvarande beteende)
-  - "Summering per användare och dag"
-- I `exportPdf`:
-  - Byt "Användare"-raden i filterhuvudet till förnamn.
-  - Om `pdfDetail === "entries"`: behåll nuvarande tabell "Poster" men ersätt `Användare`-kolumnen med enbart förnamn (redan gjort via `user_label`).
-  - Om `pdfDetail === "daily"`: aggregera `entries` per (`user_id`, datum i sv-SE) → kolumner: Datum, Användare (förnamn), Antal poster, Timmar. Sortera på datum, sedan förnamn.
+2. **User-facing toggle**
+   - Add a new state `roundPdfHours: boolean` (default `false`).
+   - Add a checkbox in the existing “Visa kostnader” popover labelled “Avrunda timmar till heltimmar i PDF”.
 
-**PDF-filnamn**: oförändrat.
+3. **Apply rounding only in the PDF export**
+   - When `roundPdfHours` is true, replace `fmtHours(...)` with `fmtRoundedHours(...)` for every time column and total in `exportPdf()`:
+     - Totaler (Total tid, Normal/OB split)
+     - Per kund, per projekt, per användare
+     - Poster or “per användare och dag” specification table
+   - A small note is appended under the filter block: “Tider är avrundade till närmaste heltimme.” when rounding is active.
+   - CSV export and the on-screen summary figures remain unchanged.
 
-## Tekniska detaljer
+## Files changed
 
-- Förnamnshjälpare i admin-summary.tsx: `(u) => (u.first_name?.trim() || u.email?.split("@")[0] || u.user_id)`.
-- I `getSummaryEntries`: bygg `firstLabels` från `auth.admin.listUsers` på samma sätt som idag, men mappa till förnamn/e-post-prefix istället för "förnamn efternamn / email".
-- Aggregeringen för "per användare och dag" görs klientsidan i `exportPdf` på det redan hämtade `entries`-arrayet (ingen ny server-fn behövs).
-- Ingen persistens av valet mellan sessioner (state i komponenten).
+- `src/routes/_authenticated/admin-summary.tsx`
+
+## Not in scope
+
+- Rounding the underlying cost calculations; displayed amounts continue to reflect exact hours.
+- Changing the web UI table or CSV export.
