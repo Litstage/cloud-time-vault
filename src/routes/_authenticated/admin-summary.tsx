@@ -580,9 +580,10 @@ function SummarySection({ title, rows, loading, totalMs, showSwatch, showAmount,
                 {showOb && (
                   <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
                     <span>Normal {fmtHours(r.normalMs ?? 0)} h</span>
-                    <span>OB1 {fmtHours(r.ob1Ms ?? 0)} h</span>
-                    <span>OB2 {fmtHours(r.ob2Ms ?? 0)} h</span>
-                    <span>OB3 {fmtHours(r.ob3Ms ?? 0)} h</span>
+                    <span>OB1 {fmtKr(r.obAmount1 ?? 0)} kr</span>
+                    <span>OB2 {fmtKr(r.obAmount2 ?? 0)} kr</span>
+                    <span>OB3 {fmtKr(r.obAmount3 ?? 0)} kr</span>
+                    <span className="font-medium text-foreground">Totalt OB {fmtKr(r.obAmount ?? 0)} kr</span>
                   </div>
                 )}
                 <div className="h-1.5 overflow-hidden rounded-full bg-muted">
