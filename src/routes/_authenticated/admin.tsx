@@ -764,7 +764,18 @@ function AdminPage() {
                               }}
                             />
                           </td>
-                          <td className="px-3 py-2 truncate max-w-[10rem]">{r.user_email ?? r.user_id}</td>
+                          <td className="px-3 py-2 max-w-[12rem]">
+                            <div className="truncate font-medium">{displayName(r)}</div>
+                            {!hasName(r) ? (
+                              <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300">
+                                Namn saknas
+                              </span>
+                            ) : (
+                              r.user_email && (
+                                <div className="truncate text-xs text-muted-foreground">{r.user_email}</div>
+                              )
+                            )}
+                          </td>
                           <td className="px-3 py-2 whitespace-nowrap">
                             {new Date(r.start_time).toLocaleDateString("sv-SE")}
                           </td>
