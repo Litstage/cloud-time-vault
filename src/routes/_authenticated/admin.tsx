@@ -53,6 +53,27 @@ function formatHours(ms: number) {
   return (ms / 3600000).toFixed(2);
 }
 
+type NameLike = {
+  first_name?: string | null;
+  last_name?: string | null;
+  user_first_name?: string | null;
+  user_last_name?: string | null;
+  email?: string | null;
+  user_email?: string | null;
+  user_id?: string;
+};
+function displayName(u: NameLike): string {
+  const fn = u.first_name ?? u.user_first_name ?? null;
+  const ln = u.last_name ?? u.user_last_name ?? null;
+  const full = [fn, ln].filter(Boolean).join(" ").trim();
+  return full || u.email || u.user_email || u.user_id || "";
+}
+function hasName(u: NameLike): boolean {
+  const fn = u.first_name ?? u.user_first_name ?? null;
+  const ln = u.last_name ?? u.user_last_name ?? null;
+  return Boolean((fn && fn.trim()) || (ln && ln.trim()));
+}
+
 function StatusBadge({ status }: { status: ManagedUser["status"] }) {
   const styles: Record<ManagedUser["status"], string> = {
     pending: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
@@ -109,15 +130,21 @@ function UsersSection(props: {
             >
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <span className="truncate text-sm font-medium">{u.email ?? u.user_id}</span>
+                  <span className="truncate text-sm font-medium">{displayName(u)}</span>
                   {u.is_admin && (
                     <span className="rounded-full bg-primary/15 px-2 py-0.5 text-xs font-medium text-primary">
                       Admin
                     </span>
                   )}
                   <StatusBadge status={u.status} />
+                  {!hasName(u) && (
+                    <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-300">
+                      Namn saknas
+                    </span>
+                  )}
                 </div>
                 <div className="text-xs text-muted-foreground">
+                  {hasName(u) && u.email ? <>{u.email} · </> : null}
                   {u.phone ? <>Tel: {u.phone} · </> : null}
                   Skapad {new Date(u.created_at).toLocaleDateString("sv-SE")}
                 </div>
@@ -267,17 +294,21 @@ function AdminPage() {
 
   const [newEmail, setNewEmail] = useState("");
   const [newPhone, setNewPhone] = useState("");
+  const [newFirstName, setNewFirstName] = useState("");
+  const [newLastName, setNewLastName] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [newMakeAdmin, setNewMakeAdmin] = useState(false);
 
   const createMut = useMutation({
-    mutationFn: (v: { email: string; password: string; phone: string; makeAdmin: boolean }) =>
-      createUser({ data: { email: v.email, password: v.password, phone: v.phone, approve: true, makeAdmin: v.makeAdmin } }),
+    mutationFn: (v: { email: string; password: string; phone: string; firstName: string; lastName: string; makeAdmin: boolean }) =>
+      createUser({ data: { email: v.email, password: v.password, phone: v.phone, firstName: v.firstName, lastName: v.lastName, approve: true, makeAdmin: v.makeAdmin } }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["managed-users"] });
       toast.success("Användare skapad och godkänd");
       setNewEmail("");
       setNewPhone("");
+      setNewFirstName("");
+      setNewLastName("");
       setNewPassword("");
       setNewMakeAdmin(false);
     },
@@ -287,6 +318,8 @@ function AdminPage() {
   const [editing, setEditing] = useState<ManagedUser | null>(null);
   const [editEmail, setEditEmail] = useState("");
   const [editPhone, setEditPhone] = useState("");
+  const [editFirstName, setEditFirstName] = useState("");
+  const [editLastName, setEditLastName] = useState("");
   const [editPassword, setEditPassword] = useState("");
   const [editHourly, setEditHourly] = useState("0");
   const [editOb1, setEditOb1] = useState("0");
@@ -294,7 +327,7 @@ function AdminPage() {
   const [editOb3, setEditOb3] = useState("0");
 
   const updateMut = useMutation({
-    mutationFn: (v: { userId: string; email?: string; phone?: string; password?: string }) =>
+    mutationFn: (v: { userId: string; email?: string; phone?: string; firstName?: string; lastName?: string; password?: string }) =>
       updateUser({ data: v }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["managed-users"] });
@@ -394,6 +427,8 @@ function AdminPage() {
     setEditing(u);
     setEditEmail(u.email ?? "");
     setEditPhone(u.phone ?? "");
+    setEditFirstName(u.first_name ?? "");
+    setEditLastName(u.last_name ?? "");
     setEditPassword("");
     setEditHourly("0"); setEditOb1("0"); setEditOb2("0"); setEditOb3("0");
     fetchWage({ data: { userId: u.user_id } })
@@ -436,7 +471,7 @@ function AdminPage() {
   const rows = entriesQ.data ?? [];
 
   const totals = useMemo(() => {
-    const perUser = new Map<string, { email: string | null; ms: number }>();
+    const perUser = new Map<string, { email: string | null; first_name: string | null; last_name: string | null; ms: number }>();
     let total = 0;
     for (const r of rows) {
       if (!r.end_time) continue;
@@ -445,6 +480,8 @@ function AdminPage() {
       const prev = perUser.get(r.user_id);
       perUser.set(r.user_id, {
         email: r.user_email,
+        first_name: r.user_first_name,
+        last_name: r.user_last_name,
         ms: (prev?.ms ?? 0) + ms,
       });
     }
@@ -553,6 +590,14 @@ function AdminPage() {
                     />
                   </div>
                   <div className="space-y-1">
+                    <Label className="text-xs">Förnamn</Label>
+                    <Input value={newFirstName} onChange={(e) => setNewFirstName(e.target.value)} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Efternamn</Label>
+                    <Input value={newLastName} onChange={(e) => setNewLastName(e.target.value)} />
+                  </div>
+                  <div className="space-y-1">
                     <Label className="text-xs">Lösenord (minst 6 tecken)</Label>
                     <Input
                       type="text"
@@ -577,6 +622,8 @@ function AdminPage() {
                         email: newEmail,
                         password: newPassword,
                         phone: newPhone,
+                        firstName: newFirstName,
+                        lastName: newLastName,
                         makeAdmin: newMakeAdmin,
                       })
                     }
@@ -597,7 +644,7 @@ function AdminPage() {
               onToggleAdmin={(u) => adminMut.mutate({ userId: u.user_id, isAdmin: !u.is_admin })}
               onEdit={openEdit}
               onDelete={(u) => {
-                if (confirm(`Ta bort ${u.email ?? u.user_id}? Detta kan inte ångras.`)) {
+                if (confirm(`Ta bort ${displayName(u)}? Detta kan inte ångras.`)) {
                   deleteMut.mutate(u.user_id);
                 }
               }}
@@ -638,7 +685,14 @@ function AdminPage() {
                 ) : (
                   totals.perUser.map(([uid, v]) => (
                     <div key={uid} className="flex items-center justify-between px-4 py-3">
-                      <div className="truncate text-sm">{v.email ?? uid}</div>
+                      <div className="truncate text-sm">
+                        {displayName({ ...v, user_id: uid })}
+                        {!hasName(v) && (
+                          <span className="ml-2 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300">
+                            Namn saknas
+                          </span>
+                        )}
+                      </div>
                       <div className="font-mono text-sm tabular-nums">{formatHours(v.ms)} h</div>
                     </div>
                   ))
@@ -717,7 +771,18 @@ function AdminPage() {
                               }}
                             />
                           </td>
-                          <td className="px-3 py-2 truncate max-w-[10rem]">{r.user_email ?? r.user_id}</td>
+                          <td className="px-3 py-2 max-w-[12rem]">
+                            <div className="truncate font-medium">{displayName(r)}</div>
+                            {!hasName(r) ? (
+                              <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300">
+                                Namn saknas
+                              </span>
+                            ) : (
+                              r.user_email && (
+                                <div className="truncate text-xs text-muted-foreground">{r.user_email}</div>
+                              )
+                            )}
+                          </td>
                           <td className="px-3 py-2 whitespace-nowrap">
                             {new Date(r.start_time).toLocaleDateString("sv-SE")}
                           </td>
@@ -851,7 +916,7 @@ function AdminPage() {
                               }}
                             />
                             <span className={isSource ? "text-muted-foreground" : ""}>
-                              {u.email ?? u.user_id}
+                              {displayName(u)}
                               {isSource ? " (källa)" : ""}
                             </span>
                           </label>
@@ -907,6 +972,16 @@ function AdminPage() {
                   onChange={(e) => setEditEmail(e.target.value)}
                 />
               </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Förnamn</Label>
+                  <Input value={editFirstName} onChange={(e) => setEditFirstName(e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Efternamn</Label>
+                  <Input value={editLastName} onChange={(e) => setEditLastName(e.target.value)} />
+                </div>
+              </div>
               <div className="space-y-1">
                 <Label className="text-xs">Telefonnummer</Label>
                 <Input
@@ -956,7 +1031,7 @@ function AdminPage() {
               disabled={updateMut.isPending || !editing}
               onClick={() => {
                 if (!editing) return;
-                const payload: { userId: string; email?: string; phone?: string; password?: string } = {
+                const payload: { userId: string; email?: string; phone?: string; firstName?: string; lastName?: string; password?: string } = {
                   userId: editing.user_id,
                 };
                 if (editEmail.trim() && editEmail.trim() !== (editing.email ?? "")) {
@@ -964,6 +1039,12 @@ function AdminPage() {
                 }
                 if (editPhone.trim() !== (editing.phone ?? "")) {
                   payload.phone = editPhone;
+                }
+                if (editFirstName.trim() !== (editing.first_name ?? "")) {
+                  payload.firstName = editFirstName;
+                }
+                if (editLastName.trim() !== (editing.last_name ?? "")) {
+                  payload.lastName = editLastName;
                 }
                 if (editPassword) payload.password = editPassword;
                 // Save wage in parallel (always — admin may have changed only wages)
@@ -1206,7 +1287,7 @@ function EntryDialog(props: {
             <Label className="text-xs">Användare</Label>
             {isEdit ? (
               <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm">
-                {entry?.user_email ?? entry?.user_id}
+                {entry ? displayName(entry) : ""}
               </div>
             ) : (
               <Select value={userId} onValueChange={setUserId}>
@@ -1214,7 +1295,7 @@ function EntryDialog(props: {
                 <SelectContent>
                   {users.map((u) => (
                     <SelectItem key={u.user_id} value={u.user_id}>
-                      {u.email ?? u.user_id}
+                      {displayName(u)}
                     </SelectItem>
                   ))}
                 </SelectContent>

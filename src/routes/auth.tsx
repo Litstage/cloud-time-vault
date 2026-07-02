@@ -23,6 +23,8 @@ function AuthPage() {
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -31,12 +33,16 @@ function AuthPage() {
     setLoading(true);
     try {
       if (mode === "signup") {
+        const meta: Record<string, string> = {};
+        if (phone.trim()) meta.phone = phone.trim();
+        if (firstName.trim()) meta.first_name = firstName.trim();
+        if (lastName.trim()) meta.last_name = lastName.trim();
         const { error } = await supabase.auth.signUp({
           email,
           password,
           options: {
             emailRedirectTo: window.location.origin,
-            data: phone.trim() ? { phone: phone.trim() } : {},
+            data: meta,
           },
         });
         if (error) throw error;
@@ -70,6 +76,27 @@ function AuthPage() {
               <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
             </div>
             {mode === "signup" && (
+              <>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="firstName">Förnamn</Label>
+                    <Input
+                      id="firstName"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      autoComplete="given-name"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="lastName">Efternamn</Label>
+                    <Input
+                      id="lastName"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      autoComplete="family-name"
+                    />
+                  </div>
+                </div>
               <div className="space-y-2">
                 <Label htmlFor="phone">Telefonnummer</Label>
                 <Input
@@ -82,6 +109,7 @@ function AuthPage() {
                   placeholder="+46 70 123 45 67"
                 />
               </div>
+              </>
             )}
             <div className="space-y-2">
               <Label htmlFor="password">Lösenord</Label>

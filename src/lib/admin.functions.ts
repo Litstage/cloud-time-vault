@@ -6,6 +6,8 @@ export type AdminEntry = {
   id: string;
   user_id: string;
   user_email: string | null;
+  user_first_name: string | null;
+  user_last_name: string | null;
   start_time: string;
   end_time: string | null;
   description: string | null;
@@ -17,6 +19,8 @@ export type ManagedUser = {
   user_id: string;
   email: string | null;
   phone: string | null;
+  first_name: string | null;
+  last_name: string | null;
   created_at: string;
   status: "pending" | "approved" | "rejected";
   approved_at: string | null;
@@ -112,13 +116,16 @@ export const listManagedUsers = createServerFn({ method: "GET" })
       if (uErr) throw new Error(uErr.message);
       for (const u of usersPage.users) {
         const a = apprMap.get(u.id) as any;
+        const meta = (u.user_metadata as Record<string, unknown> | null) ?? {};
         users.push({
           user_id: u.id,
           email: u.email ?? null,
           phone:
-            (u.user_metadata as any)?.phone ??
+            (meta as any).phone ??
             (u.phone as string | undefined) ??
             null,
+          first_name: (meta.first_name as string | undefined) ?? null,
+          last_name: (meta.last_name as string | undefined) ?? null,
           created_at: u.created_at,
           status: (a?.status as ManagedUser["status"]) ?? "pending",
           approved_at: (a?.approved_at as string | null) ?? null,
@@ -207,16 +214,20 @@ export const deleteManagedUser = createServerFn({ method: "POST" })
 export const createManagedUser = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(
-    (d: { email: string; password: string; phone?: string; approve?: boolean; makeAdmin?: boolean }) => {
+    (d: { email: string; password: string; phone?: string; firstName?: string; lastName?: string; approve?: boolean; makeAdmin?: boolean }) => {
       const email = (d.email ?? "").trim();
       const password = d.password ?? "";
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Ogiltig e-post");
       if (password.length < 6) throw new Error("Lösenord måste vara minst 6 tecken");
       const phone = (d.phone ?? "").trim();
+      const firstName = (d.firstName ?? "").trim();
+      const lastName = (d.lastName ?? "").trim();
       return {
         email,
         password,
         phone: phone || undefined,
+        firstName: firstName || undefined,
+        lastName: lastName || undefined,
         approve: d.approve !== false,
         makeAdmin: Boolean(d.makeAdmin),
       };
@@ -225,11 +236,15 @@ export const createManagedUser = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const metadata: Record<string, unknown> = {};
+    if (data.phone) metadata.phone = data.phone;
+    if (data.firstName) metadata.first_name = data.firstName;
+    if (data.lastName) metadata.last_name = data.lastName;
     const { data: created, error } = await supabaseAdmin.auth.admin.createUser({
       email: data.email,
       password: data.password,
       email_confirm: true,
-      user_metadata: data.phone ? { phone: data.phone } : {},
+      user_metadata: metadata,
     });
     if (error) throw new Error(error.message);
     const newId = created.user?.id;
@@ -256,7 +271,7 @@ export const createManagedUser = createServerFn({ method: "POST" })
 export const updateManagedUser = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(
-    (d: { userId: string; email?: string; phone?: string; password?: string }) => {
+    (d: { userId: string; email?: string; phone?: string; firstName?: string; lastName?: string; password?: string }) => {
       if (!d.userId) throw new Error("userId krävs");
       const email = d.email?.trim();
       if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Ogiltig e-post");
@@ -266,6 +281,8 @@ export const updateManagedUser = createServerFn({ method: "POST" })
         userId: d.userId,
         email: email || undefined,
         phone: d.phone !== undefined ? d.phone.trim() : undefined,
+        firstName: d.firstName !== undefined ? d.firstName.trim() : undefined,
+        lastName: d.lastName !== undefined ? d.lastName.trim() : undefined,
         password: password || undefined,
       };
     },
@@ -279,8 +296,12 @@ export const updateManagedUser = createServerFn({ method: "POST" })
     const updates: Record<string, unknown> = {};
     if (data.email) updates.email = data.email;
     if (data.password) updates.password = data.password;
-    if (data.phone !== undefined) {
-      updates.user_metadata = { ...currentMeta, phone: data.phone || null };
+    if (data.phone !== undefined || data.firstName !== undefined || data.lastName !== undefined) {
+      const nextMeta: Record<string, unknown> = { ...currentMeta };
+      if (data.phone !== undefined) nextMeta.phone = data.phone || null;
+      if (data.firstName !== undefined) nextMeta.first_name = data.firstName || null;
+      if (data.lastName !== undefined) nextMeta.last_name = data.lastName || null;
+      updates.user_metadata = nextMeta;
     }
     if (Object.keys(updates).length === 0) return { ok: true };
     const { error } = await supabaseAdmin.auth.admin.updateUserById(data.userId, updates);
@@ -314,6 +335,8 @@ export const getAllTimeEntries = createServerFn({ method: "GET" })
 
     // Fetch users (paged) to map emails
     const emails = new Map<string, string | null>();
+    const firstNames = new Map<string, string | null>();
+    const lastNames = new Map<string, string | null>();
     let page = 1;
     while (page < 20) {
       const { data: usersPage, error: uErr } = await supabaseAdmin.auth.admin.listUsers({
@@ -321,7 +344,12 @@ export const getAllTimeEntries = createServerFn({ method: "GET" })
         perPage: 1000,
       });
       if (uErr) throw new Error(uErr.message);
-      for (const u of usersPage.users) emails.set(u.id, u.email ?? null);
+      for (const u of usersPage.users) {
+        emails.set(u.id, u.email ?? null);
+        const meta = (u.user_metadata as Record<string, unknown> | null) ?? {};
+        firstNames.set(u.id, (meta.first_name as string | undefined) ?? null);
+        lastNames.set(u.id, (meta.last_name as string | undefined) ?? null);
+      }
       if (usersPage.users.length < 1000) break;
       page += 1;
     }
@@ -332,6 +360,8 @@ export const getAllTimeEntries = createServerFn({ method: "GET" })
         id: r.id as string,
         user_id: r.user_id as string,
         user_email: emails.get(r.user_id as string) ?? null,
+        user_first_name: firstNames.get(r.user_id as string) ?? null,
+        user_last_name: lastNames.get(r.user_id as string) ?? null,
         start_time: r.start_time as string,
         end_time: (r.end_time as string | null) ?? null,
         description: (r.description as string | null) ?? null,

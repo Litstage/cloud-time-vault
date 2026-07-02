@@ -124,6 +124,10 @@ function HomePage() {
   });
   const actingOnOther = userIsAdmin && targetUserId !== null && targetUserId !== selfUserId;
   const targetUser = usersQ.data?.find((u) => u.user_id === targetUserId) ?? null;
+  const nameOf = (u: { first_name?: string | null; last_name?: string | null; email?: string | null; user_id?: string }) => {
+    const full = [u.first_name, u.last_name].filter(Boolean).join(" ").trim();
+    return full || u.email || u.user_id?.slice(0, 8) || "";
+  };
 
   const listOtherFn = useServerFn(adminListEntriesForUser);
   const startOtherFn = useServerFn(adminStartTimer);
@@ -353,14 +357,14 @@ function HomePage() {
                   .filter((u) => u.user_id !== selfUserId && u.status === "approved")
                   .map((u) => (
                     <SelectItem key={u.user_id} value={u.user_id}>
-                      {u.email ?? u.user_id.slice(0, 8)}
+                      {nameOf(u)}
                     </SelectItem>
                   ))}
               </SelectContent>
             </Select>
             {actingOnOther && (
               <Badge variant="secondary" className="shrink-0">
-                Admin
+                {targetUser ? nameOf(targetUser) : "Admin"}
               </Badge>
             )}
           </div>
