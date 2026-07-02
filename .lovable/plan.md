@@ -1,17 +1,31 @@
-## Förhandsvisning av PDF
+## OB-debitering per kund
 
-Lägg till möjligheten att förhandsgranska PDF:en i webbläsaren innan nedladdning på sidan `admin-summary`.
+Två nya prisfält på kunder som används vid fakturering (påverkar inte lönesidan).
 
-### Ändringar
+### Databas (migration)
+Lägg till på `public.clients`:
+- `ob1_rate numeric not null default 0` — kr/tim mellan 22:00 och 07:00 alla dagar
+- `ob2_rate numeric not null default 0` — kr/tim hela lördag och söndag
 
-**`src/routes/_authenticated/admin-summary.tsx`**
-- Refaktorera `exportPdf` så att `jsPDF`-dokumentet byggs i en separat funktion `buildPdf()` som returnerar doc-objektet (all logik för tabeller, avrundning, val av specifikation återanvänds).
-- Lägg till en ny knapp **"Förhandsgranska PDF"** bredvid befintliga **"PDF"**-knappen.
-- Vid klick: generera PDF:en, konvertera till `blob` → `URL.createObjectURL`, och visa i en `Dialog` med ett `<iframe>` (t.ex. `h-[80vh] w-full`).
-- Dialogen har två knappar: **"Ladda ner"** (triggar samma `doc.save(...)`) och **"Stäng"** (revokerar object-URL:en).
-- Behåll befintlig **"PDF"**-knapp för direkt nedladdning utan förhandsvisning.
+`hourly_rate` fortsätter gälla för övrig tid (normaltid).
 
-### Teknisk detalj
-- `doc.output("bloburl")` eller `new Blob([doc.output("arraybuffer")], { type: "application/pdf" })` för iframe-källa.
-- Object-URL rensas med `URL.revokeObjectURL` när dialogen stängs för att undvika minnesläckor.
-- Mobil: iframe med PDF fungerar sämre på iOS Safari — där visas istället en "Öppna PDF"-länk som fallback om `navigator.userAgent` indikerar iOS.
+### Prioritet vid överlapp
+En lördag kl 23:00 räknas som **OB2** (helg vinner över natt). Detta är standardregeln i sammanställningen.
+
+### Beräkningslogik (`src/lib/admin.functions.ts`)
+Ny hjälpfunktion `splitEntryByBilling(start, end)` som stegar minut för minut och delar tiden i tre hinkar: `normalMs`, `billOb1Ms`, `billOb2Ms` enligt reglerna ovan (helt fristående från `ob_rules`).
+
+I `getSummary` byts nuvarande `billing = (ms/h) * hourly_rate` mot:
+`billing = normalH*hourly_rate + ob1H*ob1_rate + ob2H*ob2_rate`
+
+Om kunden saknar OB-priser (0) faller de tillbaka på `hourly_rate` för konsekvent resultat.
+
+### Admin-UI (`src/routes/_authenticated/admin-projects.tsx`)
+I kunddialogen: två nya nummer-fält "OB1-pris (22–07)" och "OB2-pris (helg)" bredvid befintlig timdebitering.
+
+### Sammanställning / PDF
+Ingen struktur ändras — `totalBilling` och per-rad `billing` blir automatiskt korrekta. Ingen extra kolumn läggs till.
+
+### Vad som INTE ändras
+- `ob_rules`-tabellen, lönekostnad, OB-påslag för anställda.
+- Tidregistrering, exports (CSV), månadsöversikt.
