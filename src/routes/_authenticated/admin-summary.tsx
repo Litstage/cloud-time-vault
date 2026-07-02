@@ -11,7 +11,8 @@ import {
 } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowLeft, Download, FileText, SlidersHorizontal } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { ArrowLeft, Download, Eye, FileText, SlidersHorizontal } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { isAdmin, getSummary, getSummaryEntries, listManagedUsers, type SummaryRow } from "@/lib/admin.functions";
 import jsPDF from "jspdf";
@@ -151,6 +152,38 @@ function AdminSummaryPage() {
     if (!summaryQ.data) return;
     setPdfBusy(true);
     try {
+      const { doc, filename } = await buildPdf();
+      doc.save(filename);
+    } finally {
+      setPdfBusy(false);
+    }
+  }
+
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewFilename, setPreviewFilename] = useState<string>("sammanstallning.pdf");
+
+  async function previewPdf() {
+    if (!summaryQ.data) return;
+    setPdfBusy(true);
+    try {
+      const { doc, filename } = await buildPdf();
+      const blob = doc.output("blob");
+      const url = URL.createObjectURL(blob);
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(url);
+      setPreviewFilename(filename);
+    } finally {
+      setPdfBusy(false);
+    }
+  }
+
+  function closePreview() {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(null);
+  }
+
+  async function buildPdf(): Promise<{ doc: jsPDF; filename: string }> {
+    if (!summaryQ.data) throw new Error("Ingen data");
       const entries = await queryClient.fetchQuery({
         queryKey: ["summary-entries", from, to, fromTime, toTime, userId, clientId, projectId],
         queryFn: () => fetchEntries({
@@ -281,10 +314,7 @@ function AdminSummaryPage() {
         doc.text(`Sida ${i} / ${pageCount}`, doc.internal.pageSize.getWidth() - 60, doc.internal.pageSize.getHeight() - 20);
       }
 
-      doc.save(`sammanstallning-${from}_${to}.pdf`);
-    } finally {
-      setPdfBusy(false);
-    }
+    return { doc, filename: `sammanstallning-${from}_${to}.pdf` };
   }
 
   const totalMs = summaryQ.data?.totalMs ?? 0;
@@ -405,6 +435,9 @@ function AdminSummaryPage() {
                   <Button onClick={exportCsv} variant="outline" size="sm" disabled={!summaryQ.data}>
                     <Download className="mr-2 h-4 w-4" /> CSV
                   </Button>
+                  <Button onClick={previewPdf} variant="outline" size="sm" disabled={!summaryQ.data || pdfBusy}>
+                    <Eye className="mr-2 h-4 w-4" /> Förhandsgranska
+                  </Button>
                   <Button onClick={exportPdf} variant="outline" size="sm" disabled={!summaryQ.data || pdfBusy}>
                     <FileText className="mr-2 h-4 w-4" /> {pdfBusy ? "PDF…" : "PDF"}
                   </Button>
@@ -436,6 +469,30 @@ function AdminSummaryPage() {
           </>
         )}
       </main>
+      <Dialog open={!!previewUrl} onOpenChange={(open) => { if (!open) closePreview(); }}>
+        <DialogContent className="max-w-5xl">
+          <DialogHeader>
+            <DialogTitle>Förhandsgranskning – {previewFilename}</DialogTitle>
+          </DialogHeader>
+          {previewUrl && (
+            <iframe src={previewUrl} title="PDF-förhandsgranskning" className="h-[75vh] w-full rounded border" />
+          )}
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={closePreview}>Stäng</Button>
+            <Button
+              onClick={() => {
+                if (!previewUrl) return;
+                const a = document.createElement("a");
+                a.href = previewUrl;
+                a.download = previewFilename;
+                a.click();
+              }}
+            >
+              <Download className="mr-2 h-4 w-4" /> Ladda ner
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
