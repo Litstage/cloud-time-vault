@@ -672,7 +672,7 @@ function ManualEntryDialog({ open, onOpenChange, projects, actingOnOther, target
     if (!endNorm) return toast.error("Ogiltig sluttid");
     const isoDay = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
     if (isEdit && editEntry) {
-      if (actingOnOther) {
+      if (effectiveActingOnOther) {
         try {
           const startIso = new Date(`${isoDay}T${startNorm}`).toISOString();
           let endDate = new Date(`${isoDay}T${endNorm}`);
