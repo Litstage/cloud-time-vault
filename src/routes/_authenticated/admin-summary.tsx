@@ -61,7 +61,7 @@ function AdminSummaryPage() {
   const [showNet, setShowNet] = useState(true);
   const [showEmployer, setShowEmployer] = useState(true);
   const [showBilling, setShowBilling] = useState(true);
-  const [showOb] = ((): [boolean, (v: boolean) => void] => { return [] as any; })();
+  const [showOb, setShowOb] = useState(true);
   const [pdfBusy, setPdfBusy] = useState(false);
   const [pdfDetail, setPdfDetail] = useState<"entries" | "daily">("entries");
   const [roundPdfHours, setRoundPdfHours] = useState(false);
