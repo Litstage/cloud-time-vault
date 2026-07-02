@@ -24,6 +24,12 @@ export const Route = createFileRoute("/_authenticated/admin-summary")({
 
 function fmtHours(ms: number) { return (ms / 3600000).toFixed(2); }
 function fmtKr(n: number) { return n.toLocaleString("sv-SE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function firstNameOf(u: { first_name?: string | null; email?: string | null; user_id: string }) {
+  const fn = (u.first_name ?? "").trim();
+  if (fn) return fn;
+  if (u.email) return u.email.split("@")[0];
+  return u.user_id;
+}
 
 function AdminSummaryPage() {
   const checkAdmin = useServerFn(isAdmin);
