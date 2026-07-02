@@ -19,7 +19,7 @@ import {
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Play, Square, Plus, Download, LogOut, FolderKanban, Trash2, MoreVertical, BarChart3, ShieldCheck, CalendarIcon, ChevronLeft, ChevronRight, Clock, UserCog } from "lucide-react";
+import { Play, Square, Plus, Download, LogOut, FolderKanban, Trash2, MoreVertical, BarChart3, ShieldCheck, CalendarIcon, ChevronLeft, ChevronRight, Clock, UserCog, KeyRound, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { ApprovalGate } from "@/components/approval-gate";
 import {
@@ -85,6 +85,8 @@ function HomePage() {
   const [description, setDescription] = useState("");
   const [projectId, setProjectId] = useState<string>("none");
   const [manualOpen, setManualOpen] = useState(false);
+  const [editEntry, setEditEntry] = useState<Entry | null>(null);
+  const [passwordOpen, setPasswordOpen] = useState(false);
   const [projectsOpen, setProjectsOpen] = useState(false);
   const [range, setRange] = useState<"day" | "week" | "month">("day");
   const [filterDate, setFilterDate] = useState<Date>(() => {
