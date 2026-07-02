@@ -1033,6 +1033,9 @@ function AdminPage() {
               </div>
               <div className="rounded-md border p-3">
                 <div className="mb-2 text-xs font-medium uppercase text-muted-foreground">Lön & OB</div>
+                  <div className="mb-3 rounded-md bg-muted/40 px-3 py-2 text-[11px] text-muted-foreground">
+                    OB-fälten är procentpåslag på timlönen: 50 betyder +50% på timlönen, inte 50 kr/timme.
+                  </div>
                 <div className="mb-3 space-y-1">
                   <Label className="text-xs">Personnummer (ÅÅÅÅMMDD-XXXX)</Label>
                   <Input
