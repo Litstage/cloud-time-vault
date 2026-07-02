@@ -644,7 +644,7 @@ function AdminPage() {
               onToggleAdmin={(u) => adminMut.mutate({ userId: u.user_id, isAdmin: !u.is_admin })}
               onEdit={openEdit}
               onDelete={(u) => {
-                if (confirm(`Ta bort ${u.email ?? u.user_id}? Detta kan inte ångras.`)) {
+                if (confirm(`Ta bort ${displayName(u)}? Detta kan inte ångras.`)) {
                   deleteMut.mutate(u.user_id);
                 }
               }}
