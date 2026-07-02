@@ -333,6 +333,7 @@ function AdminPage() {
   const [editTax, setEditTax] = useState("30");
   const [editTaxTableNumber, setEditTaxTableNumber] = useState("32");
   const [editTaxTableColumn, setEditTaxTableColumn] = useState("1");
+  const [editPersonalNumber, setEditPersonalNumber] = useState("");
 
   const updateMut = useMutation({
     mutationFn: (v: { userId: string; email?: string; phone?: string; firstName?: string; lastName?: string; password?: string }) =>
@@ -347,7 +348,7 @@ function AdminPage() {
   });
 
   const wageMut = useMutation({
-    mutationFn: (v: { user_id: string; hourly_rate: number; ob1_pct: number; ob2_pct: number; ob3_pct: number; employer_fee_pct: number; tax_pct: number; tax_table_number: number; tax_table_column: number }) =>
+    mutationFn: (v: { user_id: string; hourly_rate: number; ob1_pct: number; ob2_pct: number; ob3_pct: number; employer_fee_pct: number; tax_pct: number; tax_table_number: number; tax_table_column: number; personal_number: string | null }) =>
       saveWage({ data: v }),
     onSuccess: () => toast.success("Löneuppgifter sparade"),
     onError: (e: Error) => toast.error(e.message),
@@ -441,6 +442,7 @@ function AdminPage() {
     setEditHourly("0"); setEditOb1("0"); setEditOb2("0"); setEditOb3("0");
     setEditEmployerFee("31.42"); setEditTax("30");
     setEditTaxTableNumber("32"); setEditTaxTableColumn("1");
+    setEditPersonalNumber("");
     fetchWage({ data: { userId: u.user_id } })
       .then((w) => {
         setEditHourly(String(w.hourly_rate));
@@ -451,6 +453,7 @@ function AdminPage() {
         setEditTax(String(w.tax_pct));
         setEditTaxTableNumber(String(w.tax_table_number));
         setEditTaxTableColumn(String(w.tax_table_column));
+        setEditPersonalNumber(w.personal_number ?? "");
       })
       .catch(() => {});
   }
@@ -1030,6 +1033,19 @@ function AdminPage() {
               </div>
               <div className="rounded-md border p-3">
                 <div className="mb-2 text-xs font-medium uppercase text-muted-foreground">Lön & OB</div>
+                <div className="mb-3 space-y-1">
+                  <Label className="text-xs">Personnummer (ÅÅÅÅMMDD-XXXX)</Label>
+                  <Input
+                    value={editPersonalNumber}
+                    onChange={(e) => setEditPersonalNumber(e.target.value)}
+                    placeholder="19801231-1234"
+                    inputMode="numeric"
+                    autoComplete="off"
+                  />
+                  <div className="text-[11px] text-muted-foreground">
+                    Används för att automatiskt beräkna arbetsgivaravgift utifrån ålder.
+                  </div>
+                </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <Label className="text-xs">Timlön (kr)</Label>
@@ -1050,6 +1066,9 @@ function AdminPage() {
                   <div className="space-y-1">
                     <Label className="text-xs">Arbetsgivaravgift (%)</Label>
                     <Input type="number" step="0.01" value={editEmployerFee} onChange={(e) => setEditEmployerFee(e.target.value)} />
+                    <div className="text-[11px] text-muted-foreground">
+                      Ignoreras om personnummer angetts – då används 0 / 10,21 / 31,42 % beroende på ålder.
+                    </div>
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Fallback-skatt (%)</Label>
@@ -1105,6 +1124,7 @@ function AdminPage() {
                   tax_pct: Number(editTax) || 0,
                   tax_table_number: Math.max(29, Math.min(40, Number(editTaxTableNumber) || 32)),
                   tax_table_column: Math.max(1, Math.min(6, Number(editTaxTableColumn) || 1)),
+                  personal_number: editPersonalNumber.trim() ? editPersonalNumber.trim() : null,
                 });
                 updateMut.mutate(payload);
               }}
