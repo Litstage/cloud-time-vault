@@ -908,3 +908,46 @@ function ProjectsDialog({ open, onOpenChange, projects, isAdmin }: { open: boole
     </Dialog>
   );
 }
+
+function ChangePasswordDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
+  const [pw, setPw] = useState("");
+  const [pw2, setPw2] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!open) { setPw(""); setPw2(""); }
+  }, [open]);
+
+  async function save() {
+    if (pw.length < 6) return toast.error("Lösenord måste vara minst 6 tecken");
+    if (pw !== pw2) return toast.error("Lösenorden matchar inte");
+    setSaving(true);
+    const { error } = await supabase.auth.updateUser({ password: pw });
+    setSaving(false);
+    if (error) return toast.error(error.message);
+    toast.success("Lösenord uppdaterat");
+    onOpenChange(false);
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader><DialogTitle>Byt lösenord</DialogTitle></DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label className="text-base">Nytt lösenord</Label>
+            <Input type="password" value={pw} onChange={(e) => setPw(e.target.value)} className="h-12 text-base" autoComplete="new-password" />
+          </div>
+          <div className="space-y-2">
+            <Label className="text-base">Bekräfta lösenord</Label>
+            <Input type="password" value={pw2} onChange={(e) => setPw2(e.target.value)} className="h-12 text-base" autoComplete="new-password" />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" size="lg" onClick={() => onOpenChange(false)}>Avbryt</Button>
+          <Button size="lg" onClick={save} disabled={saving}>Spara</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
