@@ -1037,6 +1037,14 @@ function AdminPage() {
                     <Label className="text-xs">OB3 (% påslag)</Label>
                     <Input type="number" step="0.01" value={editOb3} onChange={(e) => setEditOb3(e.target.value)} />
                   </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Arbetsgivaravgift (%)</Label>
+                    <Input type="number" step="0.01" value={editEmployerFee} onChange={(e) => setEditEmployerFee(e.target.value)} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Skatt (%)</Label>
+                    <Input type="number" step="0.01" value={editTax} onChange={(e) => setEditTax(e.target.value)} />
+                  </div>
                 </div>
               </div>
             </div>
@@ -1072,6 +1080,8 @@ function AdminPage() {
                   ob1_pct: Number(editOb1) || 0,
                   ob2_pct: Number(editOb2) || 0,
                   ob3_pct: Number(editOb3) || 0,
+                  employer_fee_pct: Number(editEmployerFee) || 0,
+                  tax_pct: Number(editTax) || 0,
                 });
                 updateMut.mutate(payload);
               }}
