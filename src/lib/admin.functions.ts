@@ -555,6 +555,126 @@ async function logAudit(
   });
 }
 
+export const adminCopyTimeEntries = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    (d: { entryIds: string[]; targetUserIds: string[]; mode: "copy" | "move" }) => {
+      if (!Array.isArray(d.entryIds) || d.entryIds.length === 0)
+        throw new Error("Inga tidsposter valda");
+      if (!Array.isArray(d.targetUserIds) || d.targetUserIds.length === 0)
+        throw new Error("Välj minst en mottagare");
+      if (d.mode !== "copy" && d.mode !== "move")
+        throw new Error("Ogiltigt läge");
+      if (d.mode === "move" && d.targetUserIds.length !== 1)
+        throw new Error("Flytta stöder endast en mottagare");
+      return d;
+    },
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Validate target users are approved (or admins)
+    const [{ data: approvals }, { data: roles }] = await Promise.all([
+      supabaseAdmin
+        .from("user_approvals")
+        .select("user_id, status")
+        .in("user_id", data.targetUserIds),
+      supabaseAdmin
+        .from("user_roles")
+        .select("user_id, role")
+        .in("user_id", data.targetUserIds),
+    ]);
+    const approvedSet = new Set(
+      ((approvals as any[]) ?? [])
+        .filter((a) => a.status === "approved")
+        .map((a) => a.user_id as string),
+    );
+    for (const r of (roles as any[]) ?? []) {
+      if (r.role === "admin") approvedSet.add(r.user_id as string);
+    }
+    for (const uid of data.targetUserIds) {
+      if (!approvedSet.has(uid)) throw new Error("Mottagare är inte godkänd");
+    }
+
+    const { data: sourceRows, error: srcErr } = await supabaseAdmin
+      .from("time_entries")
+      .select("id, user_id, project_id, description, start_time, end_time")
+      .in("id", data.entryIds);
+    if (srcErr) throw new Error(srcErr.message);
+    if (!sourceRows || sourceRows.length === 0)
+      throw new Error("Källposter hittades inte");
+
+    let created = 0;
+    let moved = 0;
+
+    if (data.mode === "copy") {
+      for (const targetId of data.targetUserIds) {
+        const inserts = sourceRows.map((r: any) => ({
+          user_id: targetId,
+          project_id: r.project_id,
+          description: r.description,
+          start_time: r.start_time,
+          end_time: r.end_time,
+        }));
+        const { data: inserted, error } = await supabaseAdmin
+          .from("time_entries")
+          .insert(inserts)
+          .select("id");
+        if (error) throw new Error(error.message);
+        created += inserted?.length ?? 0;
+        for (let i = 0; i < (inserted?.length ?? 0); i++) {
+          const src = sourceRows[i] as any;
+          const ins = inserted![i] as any;
+          await logAudit(supabaseAdmin, context, {
+            entry_id: ins.id,
+            entry_user_id: targetId,
+            action: "create",
+            before_data: null,
+            after_data: {
+              ...inserts[i],
+              copied_from_entry_id: src.id,
+              copied_from_user_id: src.user_id,
+            },
+          });
+        }
+      }
+    } else {
+      const targetId = data.targetUserIds[0];
+      for (const r of sourceRows as any[]) {
+        if (r.user_id === targetId) continue;
+        const { error } = await supabaseAdmin
+          .from("time_entries")
+          .update({ user_id: targetId })
+          .eq("id", r.id);
+        if (error) throw new Error(error.message);
+        moved += 1;
+        await logAudit(supabaseAdmin, context, {
+          entry_id: r.id,
+          entry_user_id: targetId,
+          action: "update",
+          before_data: {
+            user_id: r.user_id,
+            project_id: r.project_id,
+            description: r.description,
+            start_time: r.start_time,
+            end_time: r.end_time,
+          },
+          after_data: {
+            user_id: targetId,
+            project_id: r.project_id,
+            description: r.description,
+            start_time: r.start_time,
+            end_time: r.end_time,
+            moved_from_user_id: r.user_id,
+          },
+        });
+      }
+    }
+
+    return { ok: true, created, moved };
+  });
+
 export const getAuditLog = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { limit?: number } | undefined) => d ?? {})
