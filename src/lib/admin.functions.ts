@@ -321,6 +321,8 @@ export const getAllTimeEntries = createServerFn({ method: "GET" })
 
     // Fetch users (paged) to map emails
     const emails = new Map<string, string | null>();
+    const firstNames = new Map<string, string | null>();
+    const lastNames = new Map<string, string | null>();
     let page = 1;
     while (page < 20) {
       const { data: usersPage, error: uErr } = await supabaseAdmin.auth.admin.listUsers({
@@ -328,7 +330,12 @@ export const getAllTimeEntries = createServerFn({ method: "GET" })
         perPage: 1000,
       });
       if (uErr) throw new Error(uErr.message);
-      for (const u of usersPage.users) emails.set(u.id, u.email ?? null);
+      for (const u of usersPage.users) {
+        emails.set(u.id, u.email ?? null);
+        const meta = (u.user_metadata as Record<string, unknown> | null) ?? {};
+        firstNames.set(u.id, (meta.first_name as string | undefined) ?? null);
+        lastNames.set(u.id, (meta.last_name as string | undefined) ?? null);
+      }
       if (usersPage.users.length < 1000) break;
       page += 1;
     }
@@ -339,6 +346,8 @@ export const getAllTimeEntries = createServerFn({ method: "GET" })
         id: r.id as string,
         user_id: r.user_id as string,
         user_email: emails.get(r.user_id as string) ?? null,
+        user_first_name: firstNames.get(r.user_id as string) ?? null,
+        user_last_name: lastNames.get(r.user_id as string) ?? null,
         start_time: r.start_time as string,
         end_time: (r.end_time as string | null) ?? null,
         description: (r.description as string | null) ?? null,
