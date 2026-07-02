@@ -156,7 +156,23 @@ export const importTaxTable = createServerFn({ method: "POST" })
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const parsed = parseTaxCsv(data.csv);
-    if (parsed.rows.length === 0) throw new Error("Inga giltiga rader hittades i CSV");
+    // If the file contains multiple tables (Skatteverket-format med tabellnr i första kolumnen),
+    // filtrera på önskad tabell.
+    let rows = parsed.rows;
+    if (parsed.tableNumbersFound.size > 0) {
+      rows = rows.filter((r: any) => r.__table === data.tableNumber);
+    }
+    if (rows.length === 0) {
+      const hint =
+        parsed.tableNumbersFound.size > 0
+          ? ` Filen innehåller tabellerna ${[...parsed.tableNumbersFound].join(", ")} men inte ${data.tableNumber}.`
+          : parsed.sample.length > 0
+            ? ` Exempel på rader som inte kunde tolkas: ${parsed.sample.map((s) => `"${s}"`).join(" | ")}`
+            : "";
+      throw new Error(
+        `Inga giltiga rader hittades i CSV. Format per rad: inkomst_från;inkomst_till;kol1;kol2;kol3;kol4;kol5;kol6 (Skatteverkets fil med tabellnr först stöds också).${hint}`,
+      );
+    }
 
     const { data: upserted, error: tErr } = await supabaseAdmin
       .from("tax_tables" as any)
@@ -182,7 +198,7 @@ export const importTaxTable = createServerFn({ method: "POST" })
       .eq("tax_table_id", tableId);
     if (delErr) throw new Error(delErr.message);
 
-    const inserts = parsed.rows.map((r) => ({ tax_table_id: tableId, ...r }));
+    const inserts = rows.map(({ __table: _t, ...r }: any) => ({ tax_table_id: tableId, ...r }));
     // Insert in chunks to avoid payload limits
     const chunkSize = 500;
     for (let i = 0; i < inserts.length; i += chunkSize) {
