@@ -887,7 +887,7 @@ export const getSummary = createServerFn({ method: "GET" })
 
     let q = supabaseAdmin
       .from("time_entries")
-      .select("id, user_id, start_time, end_time, project_id, projects(id, name, color, client_id, client, clients(id, name, hourly_rate))")
+      .select("id, user_id, start_time, end_time, project_id, projects(id, name, color, client_id, client, clients(id, name, hourly_rate, ob1_rate, ob2_rate))")
       .gte("start_time", fromIso)
       .lt("start_time", toIso)
       .not("end_time", "is", null)
@@ -1110,7 +1110,14 @@ export const getSummary = createServerFn({ method: "GET" })
       const proj = r.projects ?? null;
       const clientObj = proj?.clients ?? null;
       const clientRate = Number(clientObj?.hourly_rate ?? 0);
-      const billing = (ms / 3600000) * clientRate;
+      const ob1Rate = Number(clientObj?.ob1_rate ?? 0) || clientRate;
+      const ob2Rate = Number(clientObj?.ob2_rate ?? 0) || clientRate;
+      const billSplit = splitEntryByBilling(r.start_time as string, r.end_time as string);
+      const H = 3_600_000;
+      const billing =
+        (billSplit.normalMs / H) * clientRate +
+        (billSplit.billOb1Ms / H) * ob1Rate +
+        (billSplit.billOb2Ms / H) * ob2Rate;
       totalBilling += billing;
       const clientKey = clientObj?.id ?? proj?.client ?? "__none__";
       const clientLabel = clientObj?.name ?? proj?.client ?? "Ingen kund";
