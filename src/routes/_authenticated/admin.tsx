@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Download, ShieldCheck, Check, X, Trash2, Shield, ShieldOff, RotateCcw, UserPlus, Pencil, Plus, CalendarIcon, History, FolderKanban, BarChart3, Clock, Copy } from "lucide-react";
+import { ArrowLeft, Download, ShieldCheck, Check, X, Trash2, Shield, ShieldOff, RotateCcw, UserPlus, Pencil, Plus, CalendarIcon, History, FolderKanban, BarChart3, Clock, Copy, Receipt } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -331,6 +331,8 @@ function AdminPage() {
   const [editOb3, setEditOb3] = useState("0");
   const [editEmployerFee, setEditEmployerFee] = useState("31.42");
   const [editTax, setEditTax] = useState("30");
+  const [editTaxTableNumber, setEditTaxTableNumber] = useState("32");
+  const [editTaxTableColumn, setEditTaxTableColumn] = useState("1");
 
   const updateMut = useMutation({
     mutationFn: (v: { userId: string; email?: string; phone?: string; firstName?: string; lastName?: string; password?: string }) =>
@@ -345,7 +347,7 @@ function AdminPage() {
   });
 
   const wageMut = useMutation({
-    mutationFn: (v: { user_id: string; hourly_rate: number; ob1_pct: number; ob2_pct: number; ob3_pct: number; employer_fee_pct: number; tax_pct: number }) =>
+    mutationFn: (v: { user_id: string; hourly_rate: number; ob1_pct: number; ob2_pct: number; ob3_pct: number; employer_fee_pct: number; tax_pct: number; tax_table_number: number; tax_table_column: number }) =>
       saveWage({ data: v }),
     onSuccess: () => toast.success("Löneuppgifter sparade"),
     onError: (e: Error) => toast.error(e.message),
@@ -438,6 +440,7 @@ function AdminPage() {
     setEditPassword("");
     setEditHourly("0"); setEditOb1("0"); setEditOb2("0"); setEditOb3("0");
     setEditEmployerFee("31.42"); setEditTax("30");
+    setEditTaxTableNumber("32"); setEditTaxTableColumn("1");
     fetchWage({ data: { userId: u.user_id } })
       .then((w) => {
         setEditHourly(String(w.hourly_rate));
@@ -446,6 +449,8 @@ function AdminPage() {
         setEditOb3(String(w.ob3_pct));
         setEditEmployerFee(String(w.employer_fee_pct));
         setEditTax(String(w.tax_pct));
+        setEditTaxTableNumber(String(w.tax_table_number));
+        setEditTaxTableColumn(String(w.tax_table_column));
       })
       .catch(() => {});
   }
@@ -573,6 +578,11 @@ function AdminPage() {
               <Button asChild variant="outline">
                 <Link to="/admin-ob">
                   <Clock className="mr-2 h-4 w-4" /> OB-regler
+                </Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link to="/admin-tax-tables">
+                  <Receipt className="mr-2 h-4 w-4" /> Skattetabeller
                 </Link>
               </Button>
             </div>
@@ -1042,9 +1052,20 @@ function AdminPage() {
                     <Input type="number" step="0.01" value={editEmployerFee} onChange={(e) => setEditEmployerFee(e.target.value)} />
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs">Skatt (%)</Label>
+                    <Label className="text-xs">Fallback-skatt (%)</Label>
                     <Input type="number" step="0.01" value={editTax} onChange={(e) => setEditTax(e.target.value)} />
                   </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Skattetabell (29–40)</Label>
+                    <Input type="number" min={29} max={40} step={1} value={editTaxTableNumber} onChange={(e) => setEditTaxTableNumber(e.target.value)} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Tabellkolumn (1–6)</Label>
+                    <Input type="number" min={1} max={6} step={1} value={editTaxTableColumn} onChange={(e) => setEditTaxTableColumn(e.target.value)} />
+                  </div>
+                </div>
+                <div className="mt-2 text-[11px] text-muted-foreground">
+                  Netto beräknas per kalendermånad från Skatteverkets tabell. Faller tillbaka på fallback-procenten om tabellen saknas för året.
                 </div>
               </div>
             </div>
@@ -1082,6 +1103,8 @@ function AdminPage() {
                   ob3_pct: Number(editOb3) || 0,
                   employer_fee_pct: Number(editEmployerFee) || 0,
                   tax_pct: Number(editTax) || 0,
+                  tax_table_number: Math.max(29, Math.min(40, Number(editTaxTableNumber) || 32)),
+                  tax_table_column: Math.max(1, Math.min(6, Number(editTaxTableColumn) || 1)),
                 });
                 updateMut.mutate(payload);
               }}
