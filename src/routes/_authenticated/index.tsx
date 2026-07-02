@@ -19,10 +19,19 @@ import {
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Play, Square, Plus, Download, LogOut, FolderKanban, Trash2, MoreVertical, BarChart3, ShieldCheck, CalendarIcon, ChevronLeft, ChevronRight, Clock } from "lucide-react";
+import { Play, Square, Plus, Download, LogOut, FolderKanban, Trash2, MoreVertical, BarChart3, ShieldCheck, CalendarIcon, ChevronLeft, ChevronRight, Clock, UserCog } from "lucide-react";
 import { toast } from "sonner";
 import { ApprovalGate } from "@/components/approval-gate";
-import { isAdmin as isAdminFn } from "@/lib/admin.functions";
+import {
+  isAdmin as isAdminFn,
+  listManagedUsers,
+  adminListEntriesForUser,
+  adminStartTimer,
+  adminStopTimer,
+  adminDeleteTimeEntry,
+  adminCreateTimeEntry,
+} from "@/lib/admin.functions";
+import { Badge } from "@/components/ui/badge";
 
 export const Route = createFileRoute("/_authenticated/")({
   head: () => ({ meta: [{ title: "Tidskoll – Tidsregistrering" }] }),
@@ -92,6 +101,32 @@ function HomePage() {
   });
   const userIsAdmin = Boolean(adminQ.data?.isAdmin);
 
+  const [selfUserId, setSelfUserId] = useState<string | null>(null);
+  const [targetUserId, setTargetUserId] = useState<string | null>(null);
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) {
+        setSelfUserId(data.user.id);
+        setTargetUserId((prev) => prev ?? data.user!.id);
+      }
+    });
+  }, []);
+
+  const listUsersFn = useServerFn(listManagedUsers);
+  const usersQ = useQuery({
+    queryKey: ["managed-users"],
+    queryFn: () => listUsersFn({ data: undefined }),
+    enabled: userIsAdmin,
+    staleTime: 60_000,
+  });
+  const actingOnOther = userIsAdmin && targetUserId !== null && targetUserId !== selfUserId;
+  const targetUser = usersQ.data?.find((u) => u.user_id === targetUserId) ?? null;
+
+  const listOtherFn = useServerFn(adminListEntriesForUser);
+  const startOtherFn = useServerFn(adminStartTimer);
+  const stopOtherFn = useServerFn(adminStopTimer);
+  const deleteOtherFn = useServerFn(adminDeleteTimeEntry);
+
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
@@ -107,8 +142,12 @@ function HomePage() {
   });
 
   const entriesQ = useQuery({
-    queryKey: ["entries"],
+    queryKey: ["entries", targetUserId ?? "self", actingOnOther ? "admin" : "self"],
     queryFn: async (): Promise<Entry[]> => {
+      if (actingOnOther && targetUserId) {
+        const rows = await listOtherFn({ data: { userId: targetUserId } });
+        return rows as unknown as Entry[];
+      }
       const { data, error } = await supabase
         .from("time_entries")
         .select("id, description, start_time, end_time, project_id, projects(name, color)")
@@ -117,38 +156,69 @@ function HomePage() {
       if (error) throw error;
       return (data ?? []) as unknown as Entry[];
     },
+    enabled: !userIsAdmin || targetUserId !== null,
   });
 
   const running = entriesQ.data?.find((e) => !e.end_time) ?? null;
 
   async function startTimer() {
-    const { data: u } = await supabase.auth.getUser();
-    if (!u.user) return;
-    const { error } = await supabase.from("time_entries").insert({
-      user_id: u.user.id,
-      description: description || null,
-      project_id: projectId === "none" ? null : projectId,
-      start_time: new Date().toISOString(),
-    });
-    if (error) return toast.error(error.message);
+    if (actingOnOther && targetUserId) {
+      try {
+        await startOtherFn({
+          data: {
+            userId: targetUserId,
+            projectId: projectId === "none" ? null : projectId,
+            description: description || null,
+          },
+        });
+      } catch (e) {
+        return toast.error(e instanceof Error ? e.message : "Kunde inte starta");
+      }
+    } else {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) return;
+      const { error } = await supabase.from("time_entries").insert({
+        user_id: u.user.id,
+        description: description || null,
+        project_id: projectId === "none" ? null : projectId,
+        start_time: new Date().toISOString(),
+      });
+      if (error) return toast.error(error.message);
+    }
     setDescription("");
     qc.invalidateQueries({ queryKey: ["entries"] });
   }
 
   async function stopTimer() {
     if (!running) return;
-    const { error } = await supabase
-      .from("time_entries")
-      .update({ end_time: new Date().toISOString() })
-      .eq("id", running.id);
-    if (error) return toast.error(error.message);
+    if (actingOnOther) {
+      try {
+        await stopOtherFn({ data: { id: running.id } });
+      } catch (e) {
+        return toast.error(e instanceof Error ? e.message : "Kunde inte stoppa");
+      }
+    } else {
+      const { error } = await supabase
+        .from("time_entries")
+        .update({ end_time: new Date().toISOString() })
+        .eq("id", running.id);
+      if (error) return toast.error(error.message);
+    }
     toast.success("Tid sparad");
     qc.invalidateQueries({ queryKey: ["entries"] });
   }
 
   async function deleteEntry(id: string) {
-    const { error } = await supabase.from("time_entries").delete().eq("id", id);
-    if (error) return toast.error(error.message);
+    if (actingOnOther) {
+      try {
+        await deleteOtherFn({ data: { id } });
+      } catch (e) {
+        return toast.error(e instanceof Error ? e.message : "Kunde inte ta bort");
+      }
+    } else {
+      const { error } = await supabase.from("time_entries").delete().eq("id", id);
+      if (error) return toast.error(error.message);
+    }
     qc.invalidateQueries({ queryKey: ["entries"] });
   }
 
@@ -256,6 +326,38 @@ function HomePage() {
       </header>
 
       <main className="mx-auto max-w-2xl space-y-6 px-4 pt-6">
+        {userIsAdmin && (
+          <div className="flex items-center gap-2 rounded-lg border bg-muted/40 p-3">
+            <UserCog className="h-4 w-4 text-muted-foreground shrink-0" />
+            <Label className="text-xs text-muted-foreground shrink-0">Registrera för</Label>
+            <Select
+              value={targetUserId ?? undefined}
+              onValueChange={(v) => setTargetUserId(v)}
+            >
+              <SelectTrigger className="h-9 flex-1 min-w-0">
+                <SelectValue placeholder="Välj användare" />
+              </SelectTrigger>
+              <SelectContent>
+                {selfUserId && (
+                  <SelectItem value={selfUserId}>Mig själv</SelectItem>
+                )}
+                {(usersQ.data ?? [])
+                  .filter((u) => u.user_id !== selfUserId && u.status === "approved")
+                  .map((u) => (
+                    <SelectItem key={u.user_id} value={u.user_id}>
+                      {u.email ?? u.user_id.slice(0, 8)}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+            {actingOnOther && (
+              <Badge variant="secondary" className="shrink-0">
+                Admin
+              </Badge>
+            )}
+          </div>
+        )}
+
         {/* Timer card */}
         <Card className="p-5">
           {running ? (
@@ -413,14 +515,22 @@ function HomePage() {
         </section>
       </main>
 
-      <ManualEntryDialog open={manualOpen} onOpenChange={setManualOpen} projects={projectsQ.data ?? []} />
+      <ManualEntryDialog
+        open={manualOpen}
+        onOpenChange={setManualOpen}
+        projects={projectsQ.data ?? []}
+        actingOnOther={actingOnOther}
+        targetUserId={targetUserId}
+        targetLabel={targetUser?.email ?? null}
+      />
       <ProjectsDialog open={projectsOpen} onOpenChange={setProjectsOpen} projects={projectsQ.data ?? []} isAdmin={userIsAdmin} />
     </div>
   );
 }
 
-function ManualEntryDialog({ open, onOpenChange, projects }: { open: boolean; onOpenChange: (v: boolean) => void; projects: Project[] }) {
+function ManualEntryDialog({ open, onOpenChange, projects, actingOnOther, targetUserId, targetLabel }: { open: boolean; onOpenChange: (v: boolean) => void; projects: Project[]; actingOnOther: boolean; targetUserId: string | null; targetLabel: string | null }) {
   const qc = useQueryClient();
+  const adminCreate = useServerFn(adminCreateTimeEntry);
   const [date, setDate] = useState<Date>(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -481,23 +591,40 @@ function ManualEntryDialog({ open, onOpenChange, projects }: { open: boolean; on
     if (!dateValid) return toast.error("Ogiltigt datum");
     if (!startNorm) return toast.error("Ogiltig starttid");
     if (!endNorm) return toast.error("Ogiltig sluttid");
-    const { data: u } = await supabase.auth.getUser();
-    if (!u.user) return;
     const isoDay = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-    const startIso = new Date(`${isoDay}T${startNorm}`).toISOString();
-    let endDate = new Date(`${isoDay}T${endNorm}`);
-    if (endDate.getTime() <= new Date(startIso).getTime()) {
-      endDate = new Date(endDate.getTime() + 24 * 3600 * 1000);
+    if (actingOnOther && targetUserId) {
+      try {
+        await adminCreate({
+          data: {
+            userId: targetUserId,
+            projectId: projectId === "none" ? null : projectId,
+            description: description || null,
+            date: isoDay,
+            start: startNorm,
+            end: endNorm,
+          },
+        });
+      } catch (e) {
+        return toast.error(e instanceof Error ? e.message : "Kunde inte spara");
+      }
+    } else {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) return;
+      const startIso = new Date(`${isoDay}T${startNorm}`).toISOString();
+      let endDate = new Date(`${isoDay}T${endNorm}`);
+      if (endDate.getTime() <= new Date(startIso).getTime()) {
+        endDate = new Date(endDate.getTime() + 24 * 3600 * 1000);
+      }
+      const endIso = endDate.toISOString();
+      const { error } = await supabase.from("time_entries").insert({
+        user_id: u.user.id,
+        description: description || null,
+        project_id: projectId === "none" ? null : projectId,
+        start_time: startIso,
+        end_time: endIso,
+      });
+      if (error) return toast.error(error.message);
     }
-    const endIso = endDate.toISOString();
-    const { error } = await supabase.from("time_entries").insert({
-      user_id: u.user.id,
-      description: description || null,
-      project_id: projectId === "none" ? null : projectId,
-      start_time: startIso,
-      end_time: endIso,
-    });
-    if (error) return toast.error(error.message);
     toast.success("Tid tillagd");
     qc.invalidateQueries({ queryKey: ["entries"] });
     onOpenChange(false);
@@ -507,7 +634,12 @@ function ManualEntryDialog({ open, onOpenChange, projects }: { open: boolean; on
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-xl p-6 gap-5">
-        <DialogHeader><DialogTitle className="text-xl">Lägg till tid</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle className="text-xl">Lägg till tid</DialogTitle>
+          {actingOnOther && targetLabel && (
+            <p className="text-xs text-muted-foreground">För: {targetLabel}</p>
+          )}
+        </DialogHeader>
         <div className="space-y-5">
           <div className="space-y-2">
             <Label className="text-base">Datum</Label>
