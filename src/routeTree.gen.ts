@@ -13,6 +13,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedOverviewRouteImport } from './routes/_authenticated/overview'
+import { Route as AuthenticatedAdminTaxTablesRouteImport } from './routes/_authenticated/admin-tax-tables'
 import { Route as AuthenticatedAdminSummaryRouteImport } from './routes/_authenticated/admin-summary'
 import { Route as AuthenticatedAdminProjectsRouteImport } from './routes/_authenticated/admin-projects'
 import { Route as AuthenticatedAdminObRouteImport } from './routes/_authenticated/admin-ob'
@@ -37,6 +38,12 @@ const AuthenticatedOverviewRoute = AuthenticatedOverviewRouteImport.update({
   path: '/overview',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedAdminTaxTablesRoute =
+  AuthenticatedAdminTaxTablesRouteImport.update({
+    id: '/admin-tax-tables',
+    path: '/admin-tax-tables',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedAdminSummaryRoute =
   AuthenticatedAdminSummaryRouteImport.update({
     id: '/admin-summary',
@@ -67,6 +74,7 @@ export interface FileRoutesByFullPath {
   '/admin-ob': typeof AuthenticatedAdminObRoute
   '/admin-projects': typeof AuthenticatedAdminProjectsRoute
   '/admin-summary': typeof AuthenticatedAdminSummaryRoute
+  '/admin-tax-tables': typeof AuthenticatedAdminTaxTablesRoute
   '/overview': typeof AuthenticatedOverviewRoute
 }
 export interface FileRoutesByTo {
@@ -75,6 +83,7 @@ export interface FileRoutesByTo {
   '/admin-ob': typeof AuthenticatedAdminObRoute
   '/admin-projects': typeof AuthenticatedAdminProjectsRoute
   '/admin-summary': typeof AuthenticatedAdminSummaryRoute
+  '/admin-tax-tables': typeof AuthenticatedAdminTaxTablesRoute
   '/overview': typeof AuthenticatedOverviewRoute
   '/': typeof AuthenticatedIndexRoute
 }
@@ -86,6 +95,7 @@ export interface FileRoutesById {
   '/_authenticated/admin-ob': typeof AuthenticatedAdminObRoute
   '/_authenticated/admin-projects': typeof AuthenticatedAdminProjectsRoute
   '/_authenticated/admin-summary': typeof AuthenticatedAdminSummaryRoute
+  '/_authenticated/admin-tax-tables': typeof AuthenticatedAdminTaxTablesRoute
   '/_authenticated/overview': typeof AuthenticatedOverviewRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
 }
@@ -98,6 +108,7 @@ export interface FileRouteTypes {
     | '/admin-ob'
     | '/admin-projects'
     | '/admin-summary'
+    | '/admin-tax-tables'
     | '/overview'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -106,6 +117,7 @@ export interface FileRouteTypes {
     | '/admin-ob'
     | '/admin-projects'
     | '/admin-summary'
+    | '/admin-tax-tables'
     | '/overview'
     | '/'
   id:
@@ -116,6 +128,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin-ob'
     | '/_authenticated/admin-projects'
     | '/_authenticated/admin-summary'
+    | '/_authenticated/admin-tax-tables'
     | '/_authenticated/overview'
     | '/_authenticated/'
   fileRoutesById: FileRoutesById
@@ -155,6 +168,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedOverviewRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/admin-tax-tables': {
+      id: '/_authenticated/admin-tax-tables'
+      path: '/admin-tax-tables'
+      fullPath: '/admin-tax-tables'
+      preLoaderRoute: typeof AuthenticatedAdminTaxTablesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/admin-summary': {
       id: '/_authenticated/admin-summary'
       path: '/admin-summary'
@@ -191,6 +211,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminObRoute: typeof AuthenticatedAdminObRoute
   AuthenticatedAdminProjectsRoute: typeof AuthenticatedAdminProjectsRoute
   AuthenticatedAdminSummaryRoute: typeof AuthenticatedAdminSummaryRoute
+  AuthenticatedAdminTaxTablesRoute: typeof AuthenticatedAdminTaxTablesRoute
   AuthenticatedOverviewRoute: typeof AuthenticatedOverviewRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
 }
@@ -200,6 +221,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminObRoute: AuthenticatedAdminObRoute,
   AuthenticatedAdminProjectsRoute: AuthenticatedAdminProjectsRoute,
   AuthenticatedAdminSummaryRoute: AuthenticatedAdminSummaryRoute,
+  AuthenticatedAdminTaxTablesRoute: AuthenticatedAdminTaxTablesRoute,
   AuthenticatedOverviewRoute: AuthenticatedOverviewRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
 }
