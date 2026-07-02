@@ -420,6 +420,8 @@ function AdminPage() {
     setEditing(u);
     setEditEmail(u.email ?? "");
     setEditPhone(u.phone ?? "");
+    setEditFirstName(u.first_name ?? "");
+    setEditLastName(u.last_name ?? "");
     setEditPassword("");
     setEditHourly("0"); setEditOb1("0"); setEditOb2("0"); setEditOb3("0");
     fetchWage({ data: { userId: u.user_id } })
