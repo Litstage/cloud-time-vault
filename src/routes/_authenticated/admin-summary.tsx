@@ -458,9 +458,9 @@ function AdminSummaryPage() {
                   {showOb && (
                     <div className="grid grid-cols-2 gap-2 rounded-md bg-muted/40 p-3 text-xs sm:grid-cols-4">
                       <Stat label="Normal" value={`${fmtHours(s.totalNormalMs)} h`} />
-                      <Stat label="OB1" value={`${fmtHours(s.totalOb1Ms)} h`} />
-                      <Stat label="OB2" value={`${fmtHours(s.totalOb2Ms)} h`} />
-                      <Stat label="OB3" value={`${fmtHours(s.totalOb3Ms)} h`} />
+                      <Stat label="OB-tillägg" value={`${fmtKr(s.totalObAmount)} kr`} />
+                      <Stat label="OB-timmar" value={`${fmtHours(s.totalOb1Ms + s.totalOb2Ms + s.totalOb3Ms)} h`} />
+                      <Stat label="Andel OB" value={`${s.totalMs > 0 ? (((s.totalOb1Ms + s.totalOb2Ms + s.totalOb3Ms) / s.totalMs) * 100).toFixed(1) : "0.0"}%`} />
                     </div>
                   )}
                   {(showGross || showNet || showEmployer || showBilling) && (
