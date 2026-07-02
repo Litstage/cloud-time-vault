@@ -19,7 +19,7 @@ import {
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Play, Square, Plus, Download, LogOut, FolderKanban, Trash2, MoreVertical, BarChart3, ShieldCheck, CalendarIcon, ChevronLeft, ChevronRight, Clock, UserCog } from "lucide-react";
+import { Play, Square, Plus, Download, LogOut, FolderKanban, Trash2, MoreVertical, BarChart3, ShieldCheck, CalendarIcon, ChevronLeft, ChevronRight, Clock, UserCog, KeyRound, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { ApprovalGate } from "@/components/approval-gate";
 import {
@@ -30,6 +30,7 @@ import {
   adminStopTimer,
   adminDeleteTimeEntry,
   adminCreateTimeEntry,
+  adminUpdateTimeEntry,
 } from "@/lib/admin.functions";
 import { Badge } from "@/components/ui/badge";
 
@@ -85,6 +86,8 @@ function HomePage() {
   const [description, setDescription] = useState("");
   const [projectId, setProjectId] = useState<string>("none");
   const [manualOpen, setManualOpen] = useState(false);
+  const [editEntry, setEditEntry] = useState<Entry | null>(null);
+  const [passwordOpen, setPasswordOpen] = useState(false);
   const [projectsOpen, setProjectsOpen] = useState(false);
   const [range, setRange] = useState<"day" | "week" | "month">("day");
   const [filterDate, setFilterDate] = useState<Date>(() => {
@@ -316,6 +319,9 @@ function HomePage() {
               <DropdownMenuItem onClick={exportCsv}>
                 <Download className="mr-2 h-4 w-4" /> Exportera CSV
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setPasswordOpen(true)}>
+                <KeyRound className="mr-2 h-4 w-4" /> Byt lösenord
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={signOut}>
                 <LogOut className="mr-2 h-4 w-4" /> Logga ut
@@ -495,13 +501,20 @@ function HomePage() {
                     return (
                       <div key={e.id} className="flex items-center gap-3 px-4 py-3">
                         <div className="h-8 w-1 rounded-full" style={{ background: e.projects?.color ?? "var(--muted-foreground)" }} />
-                        <div className="min-w-0 flex-1">
+                        <button
+                          type="button"
+                          onClick={() => { setEditEntry(e); setManualOpen(true); }}
+                          className="min-w-0 flex-1 text-left"
+                        >
                           <div className="truncate text-sm font-medium">{e.description || "Ingen beskrivning"}</div>
                           <div className="text-xs text-muted-foreground">
                             {e.projects?.name ?? "Inget projekt"} · {new Date(e.start_time).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" })}–{new Date(e.end_time!).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" })}
                           </div>
-                        </div>
+                        </button>
                         <div className="font-mono text-sm tabular-nums">{formatDuration(dur)}</div>
+                        <Button variant="ghost" size="icon" onClick={() => { setEditEntry(e); setManualOpen(true); }}>
+                          <Pencil className="h-4 w-4 text-muted-foreground" />
+                        </Button>
                         <Button variant="ghost" size="icon" onClick={() => deleteEntry(e.id)}>
                           <Trash2 className="h-4 w-4 text-muted-foreground" />
                         </Button>
@@ -517,20 +530,24 @@ function HomePage() {
 
       <ManualEntryDialog
         open={manualOpen}
-        onOpenChange={setManualOpen}
+        onOpenChange={(v) => { setManualOpen(v); if (!v) setEditEntry(null); }}
         projects={projectsQ.data ?? []}
         actingOnOther={actingOnOther}
         targetUserId={targetUserId}
         targetLabel={targetUser?.email ?? null}
+        editEntry={editEntry}
       />
       <ProjectsDialog open={projectsOpen} onOpenChange={setProjectsOpen} projects={projectsQ.data ?? []} isAdmin={userIsAdmin} />
+      <ChangePasswordDialog open={passwordOpen} onOpenChange={setPasswordOpen} />
     </div>
   );
 }
 
-function ManualEntryDialog({ open, onOpenChange, projects, actingOnOther, targetUserId, targetLabel }: { open: boolean; onOpenChange: (v: boolean) => void; projects: Project[]; actingOnOther: boolean; targetUserId: string | null; targetLabel: string | null }) {
+function ManualEntryDialog({ open, onOpenChange, projects, actingOnOther, targetUserId, targetLabel, editEntry }: { open: boolean; onOpenChange: (v: boolean) => void; projects: Project[]; actingOnOther: boolean; targetUserId: string | null; targetLabel: string | null; editEntry: Entry | null }) {
   const qc = useQueryClient();
   const adminCreate = useServerFn(adminCreateTimeEntry);
+  const adminUpdate = useServerFn(adminUpdateTimeEntry);
+  const isEdit = !!editEntry;
   const [date, setDate] = useState<Date>(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -544,6 +561,28 @@ function ManualEntryDialog({ open, onOpenChange, projects, actingOnOther, target
   const [end, setEnd] = useState("10:00");
   const [description, setDescription] = useState("");
   const [projectId, setProjectId] = useState("none");
+
+  useEffect(() => {
+    if (!open) return;
+    if (editEntry) {
+      const s = new Date(editEntry.start_time);
+      const e = editEntry.end_time ? new Date(editEntry.end_time) : s;
+      const ymd = `${s.getFullYear()}-${String(s.getMonth() + 1).padStart(2, "0")}-${String(s.getDate()).padStart(2, "0")}`;
+      const hhmm = (d: Date) => `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+      setDate(new Date(s.getFullYear(), s.getMonth(), s.getDate()));
+      setDateText(ymd);
+      setStart(hhmm(s));
+      setEnd(hhmm(e));
+      setDescription(editEntry.description ?? "");
+      setProjectId(editEntry.project_id ?? "none");
+    } else {
+      const d = new Date(); d.setHours(0, 0, 0, 0);
+      setDate(d);
+      setDateText(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`);
+      setStart("09:00"); setEnd("10:00");
+      setDescription(""); setProjectId("none");
+    }
+  }, [editEntry, open]);
 
   function syncDate(d: Date) {
     setDate(d);
@@ -592,6 +631,41 @@ function ManualEntryDialog({ open, onOpenChange, projects, actingOnOther, target
     if (!startNorm) return toast.error("Ogiltig starttid");
     if (!endNorm) return toast.error("Ogiltig sluttid");
     const isoDay = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    if (isEdit && editEntry) {
+      if (actingOnOther) {
+        try {
+          await adminUpdate({
+            data: {
+              id: editEntry.id,
+              projectId: projectId === "none" ? null : projectId,
+              description: description || null,
+              date: isoDay,
+              start: startNorm,
+              end: endNorm,
+            },
+          });
+        } catch (e) {
+          return toast.error(e instanceof Error ? e.message : "Kunde inte spara");
+        }
+      } else {
+        const startIso = new Date(`${isoDay}T${startNorm}`).toISOString();
+        let endDate = new Date(`${isoDay}T${endNorm}`);
+        if (endDate.getTime() <= new Date(startIso).getTime()) {
+          endDate = new Date(endDate.getTime() + 24 * 3600 * 1000);
+        }
+        const { error } = await supabase.from("time_entries").update({
+          description: description || null,
+          project_id: projectId === "none" ? null : projectId,
+          start_time: startIso,
+          end_time: endDate.toISOString(),
+        }).eq("id", editEntry.id);
+        if (error) return toast.error(error.message);
+      }
+      toast.success("Tid uppdaterad");
+      qc.invalidateQueries({ queryKey: ["entries"] });
+      onOpenChange(false);
+      return;
+    }
     if (actingOnOther && targetUserId) {
       try {
         await adminCreate({
@@ -635,7 +709,7 @@ function ManualEntryDialog({ open, onOpenChange, projects, actingOnOther, target
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-xl p-6 gap-5">
         <DialogHeader>
-          <DialogTitle className="text-xl">Lägg till tid</DialogTitle>
+          <DialogTitle className="text-xl">{isEdit ? "Redigera tid" : "Lägg till tid"}</DialogTitle>
           {actingOnOther && targetLabel && (
             <p className="text-xs text-muted-foreground">För: {targetLabel}</p>
           )}
@@ -830,6 +904,49 @@ function ProjectsDialog({ open, onOpenChange, projects, isAdmin }: { open: boole
             ))}
           </div>
         </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ChangePasswordDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
+  const [pw, setPw] = useState("");
+  const [pw2, setPw2] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!open) { setPw(""); setPw2(""); }
+  }, [open]);
+
+  async function save() {
+    if (pw.length < 6) return toast.error("Lösenord måste vara minst 6 tecken");
+    if (pw !== pw2) return toast.error("Lösenorden matchar inte");
+    setSaving(true);
+    const { error } = await supabase.auth.updateUser({ password: pw });
+    setSaving(false);
+    if (error) return toast.error(error.message);
+    toast.success("Lösenord uppdaterat");
+    onOpenChange(false);
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader><DialogTitle>Byt lösenord</DialogTitle></DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label className="text-base">Nytt lösenord</Label>
+            <Input type="password" value={pw} onChange={(e) => setPw(e.target.value)} className="h-12 text-base" autoComplete="new-password" />
+          </div>
+          <div className="space-y-2">
+            <Label className="text-base">Bekräfta lösenord</Label>
+            <Input type="password" value={pw2} onChange={(e) => setPw2(e.target.value)} className="h-12 text-base" autoComplete="new-password" />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" size="lg" onClick={() => onOpenChange(false)}>Avbryt</Button>
+          <Button size="lg" onClick={save} disabled={saving}>Spara</Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
