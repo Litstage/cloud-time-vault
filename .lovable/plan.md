@@ -1,32 +1,17 @@
-## Problem
+Plan:
 
-Fakturering (och OB-lön) delas i "hinkar" per minut med `Date.getHours()` och `Date.getDay()`. På serversidan körs koden i UTC, så natt (22–07) och helg (lör/sön) utvärderas i fel tidszon. Resultat:
+1. Behåll nuvarande affärsregel: OB för användarnas lön är procentpåslag på timlönen.
+   - Formel: `bruttolön = timlön × normala timmar + timlön × (1 + OB% / 100) × OB-timmar`.
+   - Exempel: timlön 200 kr, OB1 50, 2 OB-timmar = 200 × 1,5 × 2 = 600 kr.
 
-- Pass 22:00–07:00 svensk tid = 20:00–05:00 UTC → OB1-timmarna hamnar fel.
-- Ett pass som börjar t.ex. lördag 00:30 svensk tid ses som fredag 23:30 UTC → OB2 blir OB1 istället.
-- Sommartid vs vintertid ger olika fel (offset 1h eller 2h).
+2. Förtydliga admin-UI:t så att det inte går att tolka OB som kronor.
+   - Behåll etiketter som `OB1 (% påslag)`, `OB2 (% påslag)`, `OB3 (% påslag)`.
+   - Lägg till kort hjälptext vid lönefälten: `50 betyder +50% på timlönen, inte 50 kr/timme`.
 
-Detta påverkar `totalBilling` och per-rad `billing` i sammanställningen — och samma bugg finns i OB-lönesplit (`splitEntryByOb`) som påverkar bruttolön / arbetsgivarkostnad / netto.
+3. Förtydliga sammanställningen.
+   - Lägg till en liten förklaring nära bruttolön i admin-sammanställningen att bruttolön inkluderar procentbaserad OB.
+   - Ingen ändring av själva beräkningen.
 
-## Fix
-
-Utvärdera veckodag och klockslag i tidszonen **Europe/Stockholm** istället för serverns lokala tid.
-
-### `src/lib/admin.functions.ts` — `splitEntryByBilling`
-- Lägg till hjälpare `getSwedishParts(date)` som via `Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Stockholm", weekday, hour, minute })` returnerar `{ weekday: 0-6, hour: 0-23 }`.
-- Byt `d.getDay()` / `d.getHours()` mot dessa värden.
-- Hantera DST automatiskt via Intl (ingen hårdkodad offset).
-
-### `src/lib/ob.ts` — `levelAt`
-- Samma fix: läs `weekday`/`hour`/`minute`/`second` i Europe/Stockholm istället för `date.getDay()` / `getHours()`.
-- OB-reglerna i DB är angivna i svensk tid, så matchningen blir korrekt året runt.
-
-### Vad som INTE ändras
-- Databas / migrationer.
-- UI, PDF, rapportstruktur.
-- Formler för lön, arbetsgivaravgift, skatt.
-- Klientkoden (tidszonberäkning där sker redan lokalt i webbläsaren).
-
-## Verifiering
-
-Efter fix testar jag två poster i preview: ett pass 22:00–07:00 vardagsnatt och ett pass lör 00:30–03:00, och kontrollerar att OB1/OB2-fördelningen och faktureringssumman stämmer i sammanställningen.
+4. Verifiera att beräkningskedjan fortfarande är oförändrad.
+   - Kontrollera att rapporten fortsatt använder `computePay` med procent-OB.
+   - Kontrollera att UI-texten visas utan att påverka PDF/export eller fakturering.
