@@ -213,20 +213,26 @@ function AdminSummaryPage() {
                 </Button>
               </div>
               {s && (
-                <div className="grid grid-cols-2 gap-2 rounded-md bg-muted/40 p-3 text-xs sm:grid-cols-6">
-                  <Stat label="Normal" value={`${fmtHours(s.totalNormalMs)} h`} />
-                  <Stat label="OB1" value={`${fmtHours(s.totalOb1Ms)} h`} />
-                  <Stat label="OB2" value={`${fmtHours(s.totalOb2Ms)} h`} />
-                  <Stat label="OB3" value={`${fmtHours(s.totalOb3Ms)} h`} />
-                  <Stat label="Lön" value={`${fmtKr(s.totalAmount)} kr`} />
-                  <Stat label="Debitering" value={`${fmtKr(s.totalBilling)} kr`} />
-                </div>
+                <>
+                  <div className="grid grid-cols-2 gap-2 rounded-md bg-muted/40 p-3 text-xs sm:grid-cols-4">
+                    <Stat label="Normal" value={`${fmtHours(s.totalNormalMs)} h`} />
+                    <Stat label="OB1" value={`${fmtHours(s.totalOb1Ms)} h`} />
+                    <Stat label="OB2" value={`${fmtHours(s.totalOb2Ms)} h`} />
+                    <Stat label="OB3" value={`${fmtHours(s.totalOb3Ms)} h`} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 rounded-md bg-muted/40 p-3 text-xs sm:grid-cols-4">
+                    <Stat label="Bruttolön" value={`${fmtKr(s.totalAmount)} kr`} />
+                    <Stat label="Netto (efter skatt)" value={`${fmtKr(s.totalNet)} kr`} />
+                    <Stat label="Arbetsgivarkostnad" value={`${fmtKr(s.totalEmployerCost)} kr`} />
+                    <Stat label="Debitering kund" value={`${fmtKr(s.totalBilling)} kr`} />
+                  </div>
+                </>
               )}
             </Card>
 
-            <SummarySection title="Per kund" rows={summaryQ.data?.perClient ?? []} loading={summaryQ.isLoading} totalMs={totalMs} showBilling />
-            <SummarySection title="Per projekt" rows={summaryQ.data?.perProject ?? []} loading={summaryQ.isLoading} totalMs={totalMs} showSwatch showBilling />
-            <SummarySection title="Per användare" rows={summaryQ.data?.perUser ?? []} loading={summaryQ.isLoading} totalMs={totalMs} showAmount />
+            <SummarySection title="Per kund" rows={summaryQ.data?.perClient ?? []} loading={summaryQ.isLoading} totalMs={totalMs} showBilling showEmployerCost />
+            <SummarySection title="Per projekt" rows={summaryQ.data?.perProject ?? []} loading={summaryQ.isLoading} totalMs={totalMs} showSwatch showBilling showEmployerCost />
+            <SummarySection title="Per användare" rows={summaryQ.data?.perUser ?? []} loading={summaryQ.isLoading} totalMs={totalMs} showAmount showEmployerCost showNet />
           </>
         )}
       </main>
