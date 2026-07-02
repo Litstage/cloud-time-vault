@@ -792,6 +792,8 @@ export type UserWage = {
   ob1_pct: number;
   ob2_pct: number;
   ob3_pct: number;
+  employer_fee_pct: number;
+  tax_pct: number;
 };
 
 export const getUserWage = createServerFn({ method: "GET" })
@@ -813,6 +815,8 @@ export const getUserWage = createServerFn({ method: "GET" })
       ob1_pct: Number(r?.ob1_pct ?? 0),
       ob2_pct: Number(r?.ob2_pct ?? 0),
       ob3_pct: Number(r?.ob3_pct ?? 0),
+      employer_fee_pct: Number(r?.employer_fee_pct ?? 31.42),
+      tax_pct: Number(r?.tax_pct ?? 30),
     };
   });
 
@@ -829,6 +833,8 @@ export const upsertUserWage = createServerFn({ method: "POST" })
         ob1_pct: data.ob1_pct,
         ob2_pct: data.ob2_pct,
         ob3_pct: data.ob3_pct,
+        employer_fee_pct: data.employer_fee_pct,
+        tax_pct: data.tax_pct,
       },
       { onConflict: "user_id" },
     );
