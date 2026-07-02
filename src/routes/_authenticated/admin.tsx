@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Download, ShieldCheck, Check, X, Trash2, Shield, ShieldOff, RotateCcw, UserPlus, Pencil, Plus, CalendarIcon, History, FolderKanban, BarChart3, Clock } from "lucide-react";
+import { ArrowLeft, Download, ShieldCheck, Check, X, Trash2, Shield, ShieldOff, RotateCcw, UserPlus, Pencil, Plus, CalendarIcon, History, FolderKanban, BarChart3, Clock, Copy } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -38,6 +38,7 @@ import {
   adminUpdateTimeEntry,
   adminDeleteTimeEntry,
   getAuditLog,
+  adminCopyTimeEntries,
   type AdminEntry,
   type ManagedUser,
   type AuditLogEntry,
@@ -368,6 +369,27 @@ function AdminPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const copyEntriesFn = useServerFn(adminCopyTimeEntries);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [copyOpen, setCopyOpen] = useState(false);
+  const [copyMode, setCopyMode] = useState<"copy" | "move">("copy");
+  const [copyTargets, setCopyTargets] = useState<Set<string>>(new Set());
+
+  const copyMut = useMutation({
+    mutationFn: (v: { entryIds: string[]; targetUserIds: string[]; mode: "copy" | "move" }) =>
+      copyEntriesFn({ data: v }),
+    onSuccess: (res: { created: number; moved: number }) => {
+      qc.invalidateQueries({ queryKey: ["admin-entries"] });
+      qc.invalidateQueries({ queryKey: ["audit-log"] });
+      if (res.moved) toast.success(`Flyttade ${res.moved} tidsposter`);
+      else toast.success(`Kopierade ${res.created} tidsposter`);
+      setCopyOpen(false);
+      setSelectedIds(new Set());
+      setCopyTargets(new Set());
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   function openEdit(u: ManagedUser) {
     setEditing(u);
     setEditEmail(u.email ?? "");
@@ -629,17 +651,42 @@ function AdminPage() {
                 <h2 className="text-sm font-medium text-muted-foreground">
                   Alla poster ({rows.length})
                 </h2>
-                <Button
-                  size="sm"
-                  onClick={() => { setEditingEntry(null); setEntryDialogOpen(true); }}
-                >
-                  <Plus className="mr-1 h-4 w-4" /> Lägg till tid
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={selectedIds.size === 0}
+                    onClick={() => {
+                      setCopyMode("copy");
+                      setCopyTargets(new Set());
+                      setCopyOpen(true);
+                    }}
+                  >
+                    <Copy className="mr-1 h-4 w-4" /> Kopiera/Flytta ({selectedIds.size})
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => { setEditingEntry(null); setEntryDialogOpen(true); }}
+                  >
+                    <Plus className="mr-1 h-4 w-4" /> Lägg till tid
+                  </Button>
+                </div>
               </div>
               <Card className="overflow-x-auto p-0">
                 <table className="w-full text-sm">
                   <thead className="bg-muted/50 text-left text-xs uppercase text-muted-foreground">
                     <tr>
+                      <th className="px-3 py-2 w-8">
+                        <input
+                          type="checkbox"
+                          aria-label="Markera alla"
+                          checked={rows.length > 0 && rows.every((r) => selectedIds.has(r.id))}
+                          onChange={(e) => {
+                            if (e.target.checked) setSelectedIds(new Set(rows.map((r) => r.id)));
+                            else setSelectedIds(new Set());
+                          }}
+                        />
+                      </th>
                       <th className="px-3 py-2">Användare</th>
                       <th className="px-3 py-2">Datum</th>
                       <th className="px-3 py-2">Projekt</th>
@@ -655,6 +702,21 @@ function AdminPage() {
                         : 0;
                       return (
                         <tr key={r.id}>
+                          <td className="px-3 py-2">
+                            <input
+                              type="checkbox"
+                              aria-label="Markera rad"
+                              checked={selectedIds.has(r.id)}
+                              onChange={(e) => {
+                                setSelectedIds((prev) => {
+                                  const next = new Set(prev);
+                                  if (e.target.checked) next.add(r.id);
+                                  else next.delete(r.id);
+                                  return next;
+                                });
+                              }}
+                            />
+                          </td>
                           <td className="px-3 py-2 truncate max-w-[10rem]">{r.user_email ?? r.user_id}</td>
                           <td className="px-3 py-2 whitespace-nowrap">
                             {new Date(r.start_time).toLocaleDateString("sv-SE")}
@@ -717,6 +779,118 @@ function AdminPage() {
         onUpdate={(v) => updateEntryMut.mutate(v)}
         saving={createEntryMut.isPending || updateEntryMut.isPending}
       />
+
+      <Dialog open={copyOpen} onOpenChange={setCopyOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Kopiera / flytta tider</DialogTitle>
+          </DialogHeader>
+          {(() => {
+            const selectedRows = rows.filter((r) => selectedIds.has(r.id));
+            const sourceUserIds = new Set(selectedRows.map((r) => r.user_id));
+            const eligible = (usersQ.data ?? []).filter(
+              (u) => u.status === "approved" || u.is_admin,
+            );
+            const forceCopy = copyTargets.size > 1;
+            const effectiveMode: "copy" | "move" = forceCopy ? "copy" : copyMode;
+            return (
+              <div className="space-y-4">
+                <div className="text-sm text-muted-foreground">
+                  {selectedRows.length} markerade poster från {sourceUserIds.size} användare.
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs">Läge</Label>
+                  <div className="flex gap-4 text-sm">
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="copy-mode"
+                        checked={effectiveMode === "copy"}
+                        onChange={() => setCopyMode("copy")}
+                      />
+                      Kopiera (behåll original)
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="copy-mode"
+                        checked={effectiveMode === "move"}
+                        disabled={forceCopy}
+                        onChange={() => setCopyMode("move")}
+                      />
+                      Flytta (byt ägare)
+                    </label>
+                  </div>
+                  {forceCopy && (
+                    <div className="text-xs text-muted-foreground">
+                      Flytta stöds endast med en mottagare.
+                    </div>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs">Mottagare</Label>
+                  <div className="max-h-56 space-y-1 overflow-y-auto rounded-md border p-2">
+                    {eligible.length === 0 ? (
+                      <div className="p-2 text-sm text-muted-foreground">Inga användare.</div>
+                    ) : (
+                      eligible.map((u) => {
+                        const isSource = sourceUserIds.has(u.user_id) && sourceUserIds.size === 1;
+                        return (
+                          <label key={u.user_id} className="flex items-center gap-2 text-sm">
+                            <input
+                              type="checkbox"
+                              checked={copyTargets.has(u.user_id)}
+                              disabled={isSource}
+                              onChange={(e) => {
+                                setCopyTargets((prev) => {
+                                  const next = new Set(prev);
+                                  if (e.target.checked) next.add(u.user_id);
+                                  else next.delete(u.user_id);
+                                  return next;
+                                });
+                              }}
+                            />
+                            <span className={isSource ? "text-muted-foreground" : ""}>
+                              {u.email ?? u.user_id}
+                              {isSource ? " (källa)" : ""}
+                            </span>
+                          </label>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+                <div className="text-sm">
+                  {effectiveMode === "copy"
+                    ? `Skapar ${selectedRows.length * copyTargets.size} nya poster.`
+                    : `Flyttar ${selectedRows.length} poster till vald användare.`}
+                </div>
+                <DialogFooter>
+                  <Button variant="ghost" onClick={() => setCopyOpen(false)}>
+                    Avbryt
+                  </Button>
+                  <Button
+                    disabled={
+                      copyMut.isPending ||
+                      copyTargets.size === 0 ||
+                      selectedRows.length === 0
+                    }
+                    onClick={() =>
+                      copyMut.mutate({
+                        entryIds: selectedRows.map((r) => r.id),
+                        targetUserIds: Array.from(copyTargets),
+                        mode: effectiveMode,
+                      })
+                    }
+                  >
+                    {effectiveMode === "copy" ? "Kopiera" : "Flytta"}
+                  </Button>
+                </DialogFooter>
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
         <DialogContent>
