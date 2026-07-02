@@ -23,6 +23,12 @@ export const Route = createFileRoute("/_authenticated/admin-summary")({
 });
 
 function fmtHours(ms: number) { return (ms / 3600000).toFixed(2); }
+function roundHours(ms: number) {
+  const hours = ms / 3600000;
+  const frac = hours - Math.floor(hours);
+  return frac >= 0.5 ? Math.ceil(hours) : Math.floor(hours);
+}
+function fmtRoundedHours(ms: number) { return `${roundHours(ms)}`; }
 function fmtKr(n: number) { return n.toLocaleString("sv-SE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 function firstNameOf(u: { first_name?: string | null; email?: string | null; user_id: string }) {
   const fn = (u.first_name ?? "").trim();
