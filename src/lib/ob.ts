@@ -20,10 +20,33 @@ function hmsToSec(t: string): number {
   return ((h * 60) + m) * 60 + (s || 0);
 }
 
+// Utvärdera veckodag och klockslag i Europe/Stockholm (DST-säkert).
+const SE_PARTS_FMT_OB = new Intl.DateTimeFormat("en-GB", {
+  timeZone: "Europe/Stockholm",
+  weekday: "short",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: false,
+});
+const WEEKDAY_MAP_OB: Record<string, number> = {
+  Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6,
+};
+function swedishWdSec(date: Date): { wd: number; sec: number } {
+  const parts = SE_PARTS_FMT_OB.formatToParts(date);
+  let wd = 0, h = 0, m = 0, s = 0;
+  for (const p of parts) {
+    if (p.type === "weekday") wd = WEEKDAY_MAP_OB[p.value] ?? 0;
+    else if (p.type === "hour") h = Number(p.value) % 24;
+    else if (p.type === "minute") m = Number(p.value);
+    else if (p.type === "second") s = Number(p.value);
+  }
+  return { wd, sec: (h * 60 + m) * 60 + s };
+}
+
 // Returns the OB level (0=normal, 1/2/3) for a given instant, picking the highest matching active rule.
 function levelAt(date: Date, rules: ObRule[]): 0 | 1 | 2 | 3 {
-  const wd = date.getDay();
-  const sec = (date.getHours() * 60 + date.getMinutes()) * 60 + date.getSeconds();
+  const { wd, sec } = swedishWdSec(date);
   let best: 0 | 1 | 2 | 3 = 0;
   for (const r of rules) {
     if (!r.active) continue;
