@@ -251,7 +251,7 @@ function AdminSummaryPage() {
             e.project_name ?? "",
             e.client_name ?? "",
             e.description ?? "",
-            fmtHours(e.ms),
+            fmtH(e.ms),
           ]),
         );
       } else {
@@ -270,7 +270,7 @@ function AdminSummaryPage() {
         addSection(
           `Summering per användare och dag (${rows.length})`,
           ["Datum", "Användare", "Antal poster", "Timmar"],
-          rows.map((r) => [r.date, r.user, String(r.count), fmtHours(r.ms)]),
+          rows.map((r) => [r.date, r.user, String(r.count), fmtH(r.ms)]),
         );
       }
 
