@@ -822,9 +822,8 @@ function isProjectActiveYmd(p: { start_date: string | null; end_date: string | n
 type EntryFormBase = {
   projectId: string | null;
   description: string | null;
-  date: string;
-  start: string;
-  end: string;
+  startIso: string;
+  endIso: string;
 };
 
 function pad2(n: number) { return String(n).padStart(2, "0"); }
@@ -1006,9 +1005,17 @@ function EntryDialog(props: {
     const base: EntryFormBase = {
       projectId: projectId === "none" ? null : projectId,
       description: description.trim() || null,
-      date: dateText,
-      start: startNorm,
-      end: endNorm,
+      ...(() => {
+        const [y, mo, d] = dateText.split("-").map(Number);
+        const [sh, sm] = startNorm.split(":").map(Number);
+        const [eh, em] = endNorm.split(":").map(Number);
+        const startD = new Date(y, mo - 1, d, sh, sm, 0, 0);
+        let endD = new Date(y, mo - 1, d, eh, em, 0, 0);
+        if (endD.getTime() <= startD.getTime()) {
+          endD = new Date(endD.getTime() + 24 * 3600 * 1000);
+        }
+        return { startIso: startD.toISOString(), endIso: endD.toISOString() };
+      })(),
     };
     if (isEdit && entry) onUpdate({ ...base, id: entry.id });
     else onCreate({ ...base, userId });
