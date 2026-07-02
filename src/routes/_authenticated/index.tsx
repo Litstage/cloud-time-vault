@@ -357,14 +357,14 @@ function HomePage() {
                   .filter((u) => u.user_id !== selfUserId && u.status === "approved")
                   .map((u) => (
                     <SelectItem key={u.user_id} value={u.user_id}>
-                      {u.email ?? u.user_id.slice(0, 8)}
+                      {nameOf(u)}
                     </SelectItem>
                   ))}
               </SelectContent>
             </Select>
             {actingOnOther && (
               <Badge variant="secondary" className="shrink-0">
-                Admin
+                {targetUser ? nameOf(targetUser) : "Admin"}
               </Badge>
             )}
           </div>
