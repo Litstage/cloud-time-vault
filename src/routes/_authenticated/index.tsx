@@ -634,14 +634,18 @@ function ManualEntryDialog({ open, onOpenChange, projects, actingOnOther, target
     if (isEdit && editEntry) {
       if (actingOnOther) {
         try {
+          const startIso = new Date(`${isoDay}T${startNorm}`).toISOString();
+          let endDate = new Date(`${isoDay}T${endNorm}`);
+          if (endDate.getTime() <= new Date(startIso).getTime()) {
+            endDate = new Date(endDate.getTime() + 24 * 3600 * 1000);
+          }
           await adminUpdate({
             data: {
               id: editEntry.id,
               projectId: projectId === "none" ? null : projectId,
               description: description || null,
-              date: isoDay,
-              start: startNorm,
-              end: endNorm,
+              startIso,
+              endIso: endDate.toISOString(),
             },
           });
         } catch (e) {
@@ -668,14 +672,18 @@ function ManualEntryDialog({ open, onOpenChange, projects, actingOnOther, target
     }
     if (actingOnOther && targetUserId) {
       try {
+        const startIso = new Date(`${isoDay}T${startNorm}`).toISOString();
+        let endDate = new Date(`${isoDay}T${endNorm}`);
+        if (endDate.getTime() <= new Date(startIso).getTime()) {
+          endDate = new Date(endDate.getTime() + 24 * 3600 * 1000);
+        }
         await adminCreate({
           data: {
             userId: targetUserId,
             projectId: projectId === "none" ? null : projectId,
             description: description || null,
-            date: isoDay,
-            start: startNorm,
-            end: endNorm,
+            startIso,
+            endIso: endDate.toISOString(),
           },
         });
       } catch (e) {
