@@ -30,6 +30,7 @@ import {
   adminStopTimer,
   adminDeleteTimeEntry,
   adminCreateTimeEntry,
+  adminUpdateTimeEntry,
 } from "@/lib/admin.functions";
 import { Badge } from "@/components/ui/badge";
 
