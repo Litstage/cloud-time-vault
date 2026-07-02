@@ -3,6 +3,30 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { splitEntryByOb, computePay, type ObRule, type ObSplit, type Wage } from "@/lib/ob";
 import { parsePersonalNumber, employerFeeForEntry } from "@/lib/employer-fee";
 
+// Billing split for clients: OB1 = 22:00–07:00 alla dagar, OB2 = hela lör/sön.
+// Helg (OB2) vinner över natt (OB1) vid överlapp.
+function splitEntryByBilling(startIso: string, endIso: string): { normalMs: number; billOb1Ms: number; billOb2Ms: number } {
+  const out = { normalMs: 0, billOb1Ms: 0, billOb2Ms: 0 };
+  const startMs = new Date(startIso).getTime();
+  const endMs = new Date(endIso).getTime();
+  if (!(endMs > startMs)) return out;
+  const MIN = 60_000;
+  let cursor = startMs;
+  while (cursor < endMs) {
+    const nextMinute = Math.floor(cursor / MIN) * MIN + MIN;
+    const next = Math.min(nextMinute, endMs);
+    const seg = next - cursor;
+    const d = new Date(cursor);
+    const wd = d.getDay(); // 0=Sun..6=Sat
+    const h = d.getHours();
+    if (wd === 0 || wd === 6) out.billOb2Ms += seg;
+    else if (h < 7 || h >= 22) out.billOb1Ms += seg;
+    else out.normalMs += seg;
+    cursor = next;
+  }
+  return out;
+}
+
 export type AdminEntry = {
   id: string;
   user_id: string;
