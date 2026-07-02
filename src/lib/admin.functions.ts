@@ -869,6 +869,10 @@ export type SummaryRow = {
   ob2Ms?: number;
   ob3Ms?: number;
   amount?: number;
+  obAmount1?: number;
+  obAmount2?: number;
+  obAmount3?: number;
+  obAmount?: number;
   billing?: number;
   employerCost?: number;
   net?: number;
@@ -885,6 +889,7 @@ export type SummaryResult = {
   totalBilling: number;
   totalEmployerCost: number;
   totalNet: number;
+  totalObAmount: number;
   perClient: SummaryRow[];
   perProject: SummaryRow[];
   perUser: SummaryRow[];
