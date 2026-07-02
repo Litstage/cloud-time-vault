@@ -121,6 +121,86 @@ export type Database = {
           },
         ]
       }
+      tax_table_rows: {
+        Row: {
+          col1: number
+          col2: number
+          col3: number
+          col4: number
+          col5: number
+          col6: number
+          id: string
+          income_from: number
+          income_to: number
+          tax_table_id: string
+        }
+        Insert: {
+          col1?: number
+          col2?: number
+          col3?: number
+          col4?: number
+          col5?: number
+          col6?: number
+          id?: string
+          income_from: number
+          income_to: number
+          tax_table_id: string
+        }
+        Update: {
+          col1?: number
+          col2?: number
+          col3?: number
+          col4?: number
+          col5?: number
+          col6?: number
+          id?: string
+          income_from?: number
+          income_to?: number
+          tax_table_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tax_table_rows_tax_table_id_fkey"
+            columns: ["tax_table_id"]
+            isOneToOne: false
+            referencedRelation: "tax_tables"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tax_tables: {
+        Row: {
+          created_at: string
+          id: string
+          imported_at: string
+          period: string
+          source_url: string | null
+          table_number: number
+          updated_at: string
+          year: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          imported_at?: string
+          period?: string
+          source_url?: string | null
+          table_number: number
+          updated_at?: string
+          year: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          imported_at?: string
+          period?: string
+          source_url?: string | null
+          table_number?: number
+          updated_at?: string
+          year?: number
+        }
+        Relationships: []
+      }
       time_entries: {
         Row: {
           created_at: string
@@ -249,6 +329,8 @@ export type Database = {
           ob2_pct: number
           ob3_pct: number
           tax_pct: number
+          tax_table_column: number
+          tax_table_number: number
           updated_at: string
           user_id: string
         }
@@ -260,6 +342,8 @@ export type Database = {
           ob2_pct?: number
           ob3_pct?: number
           tax_pct?: number
+          tax_table_column?: number
+          tax_table_number?: number
           updated_at?: string
           user_id: string
         }
@@ -271,6 +355,8 @@ export type Database = {
           ob2_pct?: number
           ob3_pct?: number
           tax_pct?: number
+          tax_table_column?: number
+          tax_table_number?: number
           updated_at?: string
           user_id?: string
         }
