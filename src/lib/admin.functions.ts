@@ -843,12 +843,15 @@ export const getSummary = createServerFn({ method: "GET" })
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
+    const isDate = (s: string | undefined | null): s is string => !!s && /^\d{4}-\d{2}-\d{2}$/.test(s);
+    if (!isDate(data.from)) throw new Error("Ogiltigt fråndatum");
+    const toDate = isDate(data.to) ? data.to : data.from;
     const fromTime = data.fromTime && /^\d{2}:\d{2}$/.test(data.fromTime) ? data.fromTime : "00:00";
     const fromIso = new Date(`${data.from}T${fromTime}:00`).toISOString();
     const hasToTime = data.toTime && /^\d{2}:\d{2}$/.test(data.toTime) && data.toTime !== "00:00";
     const toIso = hasToTime
-      ? new Date(`${data.to}T${data.toTime}:00`).toISOString()
-      : new Date(new Date(`${data.to}T00:00:00`).getTime() + 24 * 3600 * 1000).toISOString();
+      ? new Date(`${toDate}T${data.toTime}:00`).toISOString()
+      : new Date(new Date(`${toDate}T00:00:00`).getTime() + 24 * 3600 * 1000).toISOString();
 
     let q = supabaseAdmin
       .from("time_entries")
