@@ -6,6 +6,8 @@ export type AdminEntry = {
   id: string;
   user_id: string;
   user_email: string | null;
+  user_first_name: string | null;
+  user_last_name: string | null;
   start_time: string;
   end_time: string | null;
   description: string | null;
@@ -17,6 +19,8 @@ export type ManagedUser = {
   user_id: string;
   email: string | null;
   phone: string | null;
+  first_name: string | null;
+  last_name: string | null;
   created_at: string;
   status: "pending" | "approved" | "rejected";
   approved_at: string | null;
@@ -112,13 +116,16 @@ export const listManagedUsers = createServerFn({ method: "GET" })
       if (uErr) throw new Error(uErr.message);
       for (const u of usersPage.users) {
         const a = apprMap.get(u.id) as any;
+        const meta = (u.user_metadata as Record<string, unknown> | null) ?? {};
         users.push({
           user_id: u.id,
           email: u.email ?? null,
           phone:
-            (u.user_metadata as any)?.phone ??
+            (meta as any).phone ??
             (u.phone as string | undefined) ??
             null,
+          first_name: (meta.first_name as string | undefined) ?? null,
+          last_name: (meta.last_name as string | undefined) ?? null,
           created_at: u.created_at,
           status: (a?.status as ManagedUser["status"]) ?? "pending",
           approved_at: (a?.approved_at as string | null) ?? null,
