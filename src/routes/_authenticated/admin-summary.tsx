@@ -184,8 +184,8 @@ function AdminSummaryPage() {
       doc.text(filterLines, 40, 58);
 
       const totalsRows: [string, string][] = [
-        ["Total tid", `${fmtHours(s.totalMs)} h (${s.totalCount} poster)`],
-        ["Normal / OB1 / OB2 / OB3", `${fmtHours(s.totalNormalMs)} / ${fmtHours(s.totalOb1Ms)} / ${fmtHours(s.totalOb2Ms)} / ${fmtHours(s.totalOb3Ms)} h`],
+        ["Total tid", `${fmtH(s.totalMs)} h (${s.totalCount} poster)`],
+        ["Normal / OB1 / OB2 / OB3", `${fmtH(s.totalNormalMs)} / ${fmtH(s.totalOb1Ms)} / ${fmtH(s.totalOb2Ms)} / ${fmtH(s.totalOb3Ms)} h`],
       ];
       if (showGross) totalsRows.push(["Bruttolön", `${fmtKr(s.totalAmount)} kr`]);
       if (showNet) totalsRows.push(["Netto efter skatt", `${fmtKr(s.totalNet)} kr`]);
