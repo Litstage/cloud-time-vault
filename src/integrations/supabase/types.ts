@@ -243,28 +243,34 @@ export type Database = {
       user_wages: {
         Row: {
           created_at: string
+          employer_fee_pct: number
           hourly_rate: number
           ob1_pct: number
           ob2_pct: number
           ob3_pct: number
+          tax_pct: number
           updated_at: string
           user_id: string
         }
         Insert: {
           created_at?: string
+          employer_fee_pct?: number
           hourly_rate?: number
           ob1_pct?: number
           ob2_pct?: number
           ob3_pct?: number
+          tax_pct?: number
           updated_at?: string
           user_id: string
         }
         Update: {
           created_at?: string
+          employer_fee_pct?: number
           hourly_rate?: number
           ob1_pct?: number
           ob2_pct?: number
           ob3_pct?: number
+          tax_pct?: number
           updated_at?: string
           user_id?: string
         }
