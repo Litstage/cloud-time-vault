@@ -327,7 +327,7 @@ function AdminSummaryPage() {
                     <SelectContent>
                       <SelectItem value="all">Alla användare</SelectItem>
                       {usersQ.data?.map((u) => (
-                        <SelectItem key={u.user_id} value={u.user_id}>{u.email ?? u.user_id}</SelectItem>
+                        <SelectItem key={u.user_id} value={u.user_id}>{firstNameOf(u)}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
