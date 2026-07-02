@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { splitEntryByOb, computePay, type ObRule, type ObSplit, type Wage } from "@/lib/ob";
-import { parsePersonalNumber, employerFeePctForAge } from "@/lib/employer-fee";
+import { parsePersonalNumber, employerFeeForEntry } from "@/lib/employer-fee";
 
 export type AdminEntry = {
   id: string;
@@ -1051,6 +1051,15 @@ export const getSummary = createServerFn({ method: "GET" })
     let totalEmployerCost = 0;
     let totalNet = 0;
 
+    // Sortera så att ungdomsnedsättningens månadstak fylls i tidsordning per användare.
+    facts.sort((a, b) => {
+      if (a.userId !== b.userId) return a.userId < b.userId ? -1 : 1;
+      if (a.monthKey !== b.monthKey) return a.monthKey < b.monthKey ? -1 : 1;
+      return new Date(a.row.start_time as string).getTime() -
+        new Date(b.row.start_time as string).getTime();
+    });
+    const runningGrossByUserMonth = new Map<string, number>();
+
     for (const f of facts) {
       const r = f.row;
       const ms = f.ms;
@@ -1060,10 +1069,16 @@ export const getSummary = createServerFn({ method: "GET" })
       const amount = f.amount;
       const uidRow = r.user_id as string;
       const birth = birthMap.get(uidRow) ?? null;
-      const feePct = birth
-        ? employerFeePctForAge(birth, new Date(r.start_time as string))
-        : (feeMap.get(uidRow) ?? 31.42);
-      const employerCost = amount * (1 + feePct / 100);
+      const gmKey = `${f.userId}|${f.monthKey}`;
+      const grossBeforeInMonth = runningGrossByUserMonth.get(gmKey) ?? 0;
+      const { cost: employerCost } = employerFeeForEntry({
+        birth,
+        entryDate: new Date(r.start_time as string),
+        entryGross: amount,
+        grossBeforeInMonth,
+        fallbackPct: feeMap.get(uidRow) ?? 31.42,
+      });
+      runningGrossByUserMonth.set(gmKey, grossBeforeInMonth + amount);
       const netRate = netRateByUserMonth.get(`${f.userId}|${f.monthKey}`) ?? 0.7;
       const net = amount * netRate;
       totalSplit.normalMs += split.normalMs;
