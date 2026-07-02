@@ -31,6 +31,7 @@ import {
   adminDeleteTimeEntry,
   adminCreateTimeEntry,
   adminUpdateTimeEntry,
+  getAllTimeEntries,
 } from "@/lib/admin.functions";
 import { Badge } from "@/components/ui/badge";
 
@@ -51,6 +52,10 @@ type Entry = {
   end_time: string | null;
   project_id: string | null;
   projects?: { name: string; color: string } | null;
+  user_id?: string | null;
+  user_first_name?: string | null;
+  user_last_name?: string | null;
+  user_email?: string | null;
 };
 
 function formatDuration(ms: number) {
