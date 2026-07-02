@@ -791,6 +791,18 @@ export type SummaryResult = {
   perUser: SummaryRow[];
 };
 
+export type DetailedEntry = {
+  id: string;
+  user_id: string;
+  user_label: string;
+  start_time: string;
+  end_time: string;
+  ms: number;
+  project_name: string | null;
+  client_name: string | null;
+  description: string | null;
+};
+
 export type UserWage = {
   user_id: string;
   hourly_rate: number;
@@ -1143,4 +1155,79 @@ export const getSummary = createServerFn({ method: "GET" })
       perProject: Array.from(perProject.values()).sort(sortDesc),
       perUser: Array.from(perUser.values()).sort(sortDesc),
     };
+  });
+
+export const getSummaryEntries = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: SummaryFilters) => d)
+  .handler(async ({ data, context }): Promise<DetailedEntry[]> => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const isDate = (s: string | undefined | null): s is string => !!s && /^\d{4}-\d{2}-\d{2}$/.test(s);
+    if (!isDate(data.from)) throw new Error("Ogiltigt fråndatum");
+    const toDate = isDate(data.to) ? data.to : data.from;
+    const fromTime = data.fromTime && /^\d{2}:\d{2}$/.test(data.fromTime) ? data.fromTime : "00:00";
+    const fromIso = new Date(`${data.from}T${fromTime}:00`).toISOString();
+    const hasToTime = data.toTime && /^\d{2}:\d{2}$/.test(data.toTime) && data.toTime !== "00:00";
+    const toIso = hasToTime
+      ? new Date(`${toDate}T${data.toTime}:00`).toISOString()
+      : new Date(new Date(`${toDate}T00:00:00`).getTime() + 24 * 3600 * 1000).toISOString();
+
+    let q = supabaseAdmin
+      .from("time_entries")
+      .select("id, user_id, start_time, end_time, description, projects(id, name, client_id, client, clients(id, name))")
+      .gte("start_time", fromIso)
+      .lt("start_time", toIso)
+      .not("end_time", "is", null)
+      .order("start_time", { ascending: true })
+      .limit(20000);
+    if (data.userId) q = q.eq("user_id", data.userId);
+    if (data.projectId) q = q.eq("project_id", data.projectId);
+
+    const { data: rows, error } = await q;
+    if (error) throw new Error(error.message);
+
+    const filtered = (rows ?? []).filter((r: any) => {
+      if (!data.clientId) return true;
+      return (r.projects?.client_id ?? null) === data.clientId;
+    });
+
+    const userIds = new Set<string>(filtered.map((r: any) => r.user_id as string));
+    const userLabels = new Map<string, string>();
+    if (userIds.size > 0) {
+      let page = 1;
+      while (page < 20) {
+        const { data: usersPage, error: uErr } = await supabaseAdmin.auth.admin.listUsers({
+          page, perPage: 1000,
+        });
+        if (uErr) throw new Error(uErr.message);
+        for (const u of usersPage.users) {
+          const md = (u.user_metadata ?? {}) as any;
+          const first = (md.first_name ?? "").trim();
+          const last = (md.last_name ?? "").trim();
+          const name = [first, last].filter(Boolean).join(" ");
+          userLabels.set(u.id, name || u.email || u.id);
+        }
+        if (usersPage.users.length < 1000) break;
+        page += 1;
+      }
+    }
+
+    return filtered.map((r: any) => {
+      const ms = new Date(r.end_time).getTime() - new Date(r.start_time).getTime();
+      const proj = r.projects ?? null;
+      const client = proj?.clients ?? null;
+      return {
+        id: r.id as string,
+        user_id: r.user_id as string,
+        user_label: userLabels.get(r.user_id as string) ?? (r.user_id as string),
+        start_time: r.start_time as string,
+        end_time: r.end_time as string,
+        ms,
+        project_name: proj?.name ?? null,
+        client_name: client?.name ?? proj?.client ?? null,
+        description: (r.description as string | null) ?? null,
+      };
+    });
   });

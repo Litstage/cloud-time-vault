@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -9,9 +9,13 @@ import { Label } from "@/components/ui/label";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, Download } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ArrowLeft, Download, FileText, SlidersHorizontal } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { isAdmin, getSummary, listManagedUsers, type SummaryRow } from "@/lib/admin.functions";
+import { isAdmin, getSummary, getSummaryEntries, listManagedUsers, type SummaryRow } from "@/lib/admin.functions";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 export const Route = createFileRoute("/_authenticated/admin-summary")({
   head: () => ({ meta: [{ title: "Sammanställning – Admin" }] }),
@@ -25,6 +29,8 @@ function AdminSummaryPage() {
   const checkAdmin = useServerFn(isAdmin);
   const fetchSummary = useServerFn(getSummary);
   const fetchUsers = useServerFn(listManagedUsers);
+  const fetchEntries = useServerFn(getSummaryEntries);
+  const queryClient = useQueryClient();
 
   const adminQ = useQuery({ queryKey: ["is-admin"], queryFn: () => checkAdmin({ data: undefined }) });
 
@@ -37,6 +43,12 @@ function AdminSummaryPage() {
   const [userId, setUserId] = useState<string>("all");
   const [clientId, setClientId] = useState<string>("all");
   const [projectId, setProjectId] = useState<string>("all");
+
+  const [showGross, setShowGross] = useState(true);
+  const [showNet, setShowNet] = useState(true);
+  const [showEmployer, setShowEmployer] = useState(true);
+  const [showBilling, setShowBilling] = useState(true);
+  const [pdfBusy, setPdfBusy] = useState(false);
 
   const usersQ = useQuery({
     queryKey: ["managed-users"],
@@ -121,6 +133,124 @@ function AdminSummaryPage() {
     URL.revokeObjectURL(url);
   }
 
+  async function exportPdf() {
+    if (!summaryQ.data) return;
+    setPdfBusy(true);
+    try {
+      const entries = await queryClient.fetchQuery({
+        queryKey: ["summary-entries", from, to, fromTime, toTime, userId, clientId, projectId],
+        queryFn: () => fetchEntries({
+          data: {
+            from, to, fromTime, toTime,
+            userId: userId === "all" ? null : userId,
+            clientId: clientId === "all" ? null : clientId,
+            projectId: projectId === "all" ? null : projectId,
+          },
+        }),
+      });
+
+      const doc = new jsPDF({ unit: "pt", format: "a4" });
+      const s = summaryQ.data;
+      const usersMap = new Map(usersQ.data?.map((u) => [u.user_id, u.email ?? u.user_id]) ?? []);
+      const clientsMap = new Map(clientsQ.data?.map((c) => [c.id, c.name]) ?? []);
+      const projectsMap = new Map(projectsQ.data?.map((p) => [p.id, p.name]) ?? []);
+      const timeSuffix = (fromTime !== "00:00" || toTime !== "00:00") ? ` ${fromTime}–${toTime}` : "";
+
+      doc.setFontSize(16);
+      doc.text("Sammanställning", 40, 40);
+      doc.setFontSize(10);
+      const filterLines = [
+        `Period: ${from} – ${to}${timeSuffix}`,
+        `Användare: ${userId === "all" ? "Alla" : (usersMap.get(userId) ?? userId)}`,
+        `Kund: ${clientId === "all" ? "Alla" : (clientsMap.get(clientId) ?? clientId)}`,
+        `Projekt: ${projectId === "all" ? "Alla" : (projectsMap.get(projectId) ?? projectId)}`,
+      ];
+      doc.text(filterLines, 40, 58);
+
+      const totalsRows: [string, string][] = [
+        ["Total tid", `${fmtHours(s.totalMs)} h (${s.totalCount} poster)`],
+        ["Normal / OB1 / OB2 / OB3", `${fmtHours(s.totalNormalMs)} / ${fmtHours(s.totalOb1Ms)} / ${fmtHours(s.totalOb2Ms)} / ${fmtHours(s.totalOb3Ms)} h`],
+      ];
+      if (showGross) totalsRows.push(["Bruttolön", `${fmtKr(s.totalAmount)} kr`]);
+      if (showNet) totalsRows.push(["Netto efter skatt", `${fmtKr(s.totalNet)} kr`]);
+      if (showEmployer) totalsRows.push(["Arbetsgivarkostnad", `${fmtKr(s.totalEmployerCost)} kr`]);
+      if (showBilling) totalsRows.push(["Debitering kund", `${fmtKr(s.totalBilling)} kr`]);
+
+      autoTable(doc, {
+        startY: 58 + filterLines.length * 12 + 10,
+        head: [["Totaler", ""]],
+        body: totalsRows,
+        theme: "striped",
+        styles: { fontSize: 9 },
+        headStyles: { fillColor: [245, 158, 11] },
+      });
+
+      const costCols: string[] = [];
+      if (showGross) costCols.push("Brutto");
+      if (showNet) costCols.push("Netto");
+      if (showEmployer) costCols.push("Arb.giv.");
+      if (showBilling) costCols.push("Debitering");
+
+      const rowCostCells = (r: SummaryRow): string[] => {
+        const out: string[] = [];
+        if (showGross) out.push(fmtKr(r.amount ?? 0));
+        if (showNet) out.push(fmtKr(r.net ?? 0));
+        if (showEmployer) out.push(fmtKr(r.employerCost ?? 0));
+        if (showBilling) out.push(fmtKr(r.billing ?? 0));
+        return out;
+      };
+
+      const addSection = (title: string, cols: string[], body: string[][]) => {
+        const y = (doc as any).lastAutoTable?.finalY ?? 100;
+        doc.setFontSize(12);
+        doc.text(title, 40, y + 22);
+        autoTable(doc, {
+          startY: y + 28,
+          head: [cols],
+          body,
+          theme: "striped",
+          styles: { fontSize: 8 },
+          headStyles: { fillColor: [245, 158, 11] },
+        });
+      };
+
+      addSection("Per kund", ["Kund", "Timmar", ...costCols],
+        s.perClient.map((r) => [r.label, fmtHours(r.ms), ...rowCostCells(r)]));
+      addSection("Per projekt", ["Projekt", "Kund", "Timmar", ...costCols],
+        s.perProject.map((r) => [r.label, r.sublabel ?? "", fmtHours(r.ms), ...rowCostCells(r)]));
+      addSection("Per användare", ["Användare", "Timmar", ...costCols],
+        s.perUser.map((r) => [r.label, fmtHours(r.ms), ...rowCostCells(r)]));
+
+      const fmtDate = (iso: string) => new Date(iso).toLocaleDateString("sv-SE");
+      const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" });
+      addSection(
+        `Poster (${entries.length})`,
+        ["Datum", "Start", "Slut", "Användare", "Projekt", "Kund", "Beskrivning", "Timmar"],
+        entries.map((e) => [
+          fmtDate(e.start_time),
+          fmtTime(e.start_time),
+          fmtTime(e.end_time),
+          e.user_label,
+          e.project_name ?? "",
+          e.client_name ?? "",
+          e.description ?? "",
+          fmtHours(e.ms),
+        ]),
+      );
+
+      const pageCount = doc.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i += 1) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.text(`Sida ${i} / ${pageCount}`, doc.internal.pageSize.getWidth() - 60, doc.internal.pageSize.getHeight() - 20);
+      }
+
+      doc.save(`sammanstallning-${from}_${to}.pdf`);
+    } finally {
+      setPdfBusy(false);
+    }
+  }
+
   const totalMs = summaryQ.data?.totalMs ?? 0;
   const s = summaryQ.data;
 
@@ -200,7 +330,7 @@ function AdminSummaryPage() {
                   </Select>
                 </div>
               </div>
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="text-sm">
                   Total tid:{" "}
                   <span className="font-mono font-semibold tabular-nums">{fmtHours(totalMs)} h</span>
@@ -208,9 +338,27 @@ function AdminSummaryPage() {
                     <span className="text-muted-foreground"> · {s.totalCount} poster</span>
                   )}
                 </div>
-                <Button onClick={exportCsv} variant="outline" size="sm" disabled={!summaryQ.data}>
-                  <Download className="mr-2 h-4 w-4" /> CSV
-                </Button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        <SlidersHorizontal className="mr-2 h-4 w-4" /> Visa kostnader
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent align="end" className="w-56 space-y-2">
+                      <CostToggle label="Bruttolön" checked={showGross} onChange={setShowGross} />
+                      <CostToggle label="Netto efter skatt" checked={showNet} onChange={setShowNet} />
+                      <CostToggle label="Arbetsgivarkostnad" checked={showEmployer} onChange={setShowEmployer} />
+                      <CostToggle label="Debitering kund" checked={showBilling} onChange={setShowBilling} />
+                    </PopoverContent>
+                  </Popover>
+                  <Button onClick={exportCsv} variant="outline" size="sm" disabled={!summaryQ.data}>
+                    <Download className="mr-2 h-4 w-4" /> CSV
+                  </Button>
+                  <Button onClick={exportPdf} variant="outline" size="sm" disabled={!summaryQ.data || pdfBusy}>
+                    <FileText className="mr-2 h-4 w-4" /> {pdfBusy ? "PDF…" : "PDF"}
+                  </Button>
+                </div>
               </div>
               {s && (
                 <>
@@ -220,23 +368,34 @@ function AdminSummaryPage() {
                     <Stat label="OB2" value={`${fmtHours(s.totalOb2Ms)} h`} />
                     <Stat label="OB3" value={`${fmtHours(s.totalOb3Ms)} h`} />
                   </div>
-                  <div className="grid grid-cols-2 gap-2 rounded-md bg-muted/40 p-3 text-xs sm:grid-cols-4">
-                    <Stat label="Bruttolön" value={`${fmtKr(s.totalAmount)} kr`} />
-                    <Stat label="Netto (efter skatt)" value={`${fmtKr(s.totalNet)} kr`} />
-                    <Stat label="Arbetsgivarkostnad" value={`${fmtKr(s.totalEmployerCost)} kr`} />
-                    <Stat label="Debitering kund" value={`${fmtKr(s.totalBilling)} kr`} />
-                  </div>
+                  {(showGross || showNet || showEmployer || showBilling) && (
+                    <div className="grid grid-cols-2 gap-2 rounded-md bg-muted/40 p-3 text-xs sm:grid-cols-4">
+                      {showGross && <Stat label="Bruttolön" value={`${fmtKr(s.totalAmount)} kr`} />}
+                      {showNet && <Stat label="Netto (efter skatt)" value={`${fmtKr(s.totalNet)} kr`} />}
+                      {showEmployer && <Stat label="Arbetsgivarkostnad" value={`${fmtKr(s.totalEmployerCost)} kr`} />}
+                      {showBilling && <Stat label="Debitering kund" value={`${fmtKr(s.totalBilling)} kr`} />}
+                    </div>
+                  )}
                 </>
               )}
             </Card>
 
-            <SummarySection title="Per kund" rows={summaryQ.data?.perClient ?? []} loading={summaryQ.isLoading} totalMs={totalMs} showBilling showEmployerCost />
-            <SummarySection title="Per projekt" rows={summaryQ.data?.perProject ?? []} loading={summaryQ.isLoading} totalMs={totalMs} showSwatch showBilling showEmployerCost />
-            <SummarySection title="Per användare" rows={summaryQ.data?.perUser ?? []} loading={summaryQ.isLoading} totalMs={totalMs} showAmount showEmployerCost showNet />
+            <SummarySection title="Per kund" rows={summaryQ.data?.perClient ?? []} loading={summaryQ.isLoading} totalMs={totalMs} showAmount={showGross} showNet={showNet} showBilling={showBilling} showEmployerCost={showEmployer} />
+            <SummarySection title="Per projekt" rows={summaryQ.data?.perProject ?? []} loading={summaryQ.isLoading} totalMs={totalMs} showSwatch showAmount={showGross} showNet={showNet} showBilling={showBilling} showEmployerCost={showEmployer} />
+            <SummarySection title="Per användare" rows={summaryQ.data?.perUser ?? []} loading={summaryQ.isLoading} totalMs={totalMs} showAmount={showGross} showNet={showNet} showBilling={showBilling} showEmployerCost={showEmployer} />
           </>
         )}
       </main>
     </div>
+  );
+}
+
+function CostToggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <label className="flex cursor-pointer items-center gap-2 text-sm">
+      <Checkbox checked={checked} onCheckedChange={(v) => onChange(!!v)} />
+      <span>{label}</span>
+    </label>
   );
 }
 
