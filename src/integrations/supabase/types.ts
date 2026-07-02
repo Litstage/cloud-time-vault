@@ -328,6 +328,7 @@ export type Database = {
           ob1_pct: number
           ob2_pct: number
           ob3_pct: number
+          personal_number: string | null
           tax_pct: number
           tax_table_column: number
           tax_table_number: number
@@ -341,6 +342,7 @@ export type Database = {
           ob1_pct?: number
           ob2_pct?: number
           ob3_pct?: number
+          personal_number?: string | null
           tax_pct?: number
           tax_table_column?: number
           tax_table_number?: number
@@ -354,6 +356,7 @@ export type Database = {
           ob1_pct?: number
           ob2_pct?: number
           ob3_pct?: number
+          personal_number?: string | null
           tax_pct?: number
           tax_table_column?: number
           tax_table_number?: number

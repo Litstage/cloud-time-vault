@@ -1,0 +1,1 @@
+ALTER TABLE public.user_wages ADD COLUMN IF NOT EXISTS personal_number text;
