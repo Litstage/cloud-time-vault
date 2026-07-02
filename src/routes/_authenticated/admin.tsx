@@ -743,6 +743,8 @@ function AdminPage() {
                       </th>
                       <th className="px-3 py-2">Användare</th>
                       <th className="px-3 py-2">Datum</th>
+                      <th className="px-3 py-2">Start</th>
+                      <th className="px-3 py-2">Slut</th>
                       <th className="px-3 py-2">Projekt</th>
                       <th className="px-3 py-2">Beskrivning</th>
                       <th className="px-3 py-2 text-right">Timmar</th>
