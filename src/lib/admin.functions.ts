@@ -341,18 +341,12 @@ export const getAllTimeEntries = createServerFn({ method: "GET" })
     });
   });
 
-function computeIsoTimes(dateIso: string, startHHMM: string, endHHMM: string) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateIso)) throw new Error("Ogiltigt datum");
-  if (!/^\d{2}:\d{2}$/.test(startHHMM) || !/^\d{2}:\d{2}$/.test(endHHMM))
-    throw new Error("Ogiltig tid");
-  const startDate = new Date(`${dateIso}T${startHHMM}:00`);
-  let endDate = new Date(`${dateIso}T${endHHMM}:00`);
-  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime()))
-    throw new Error("Ogiltigt datum/tid");
-  if (endDate.getTime() <= startDate.getTime()) {
-    endDate = new Date(endDate.getTime() + 24 * 3600 * 1000);
-  }
-  return { start: startDate.toISOString(), end: endDate.toISOString() };
+function validateIsoRange(startIso: string, endIso: string) {
+  const s = new Date(startIso);
+  const e = new Date(endIso);
+  if (isNaN(s.getTime()) || isNaN(e.getTime())) throw new Error("Ogiltigt datum/tid");
+  if (e.getTime() <= s.getTime()) throw new Error("Sluttid måste vara efter starttid");
+  return { start: s.toISOString(), end: e.toISOString() };
 }
 
 export const adminCreateTimeEntry = createServerFn({ method: "POST" })
@@ -362,14 +356,13 @@ export const adminCreateTimeEntry = createServerFn({ method: "POST" })
       userId: string;
       projectId: string | null;
       description: string | null;
-      date: string;
-      start: string;
-      end: string;
+      startIso: string;
+      endIso: string;
     }) => d,
   )
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
-    const { start, end } = computeIsoTimes(data.date, data.start, data.end);
+    const { start, end } = validateIsoRange(data.startIso, data.endIso);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const payload = {
       user_id: data.userId,
@@ -401,14 +394,13 @@ export const adminUpdateTimeEntry = createServerFn({ method: "POST" })
       id: string;
       projectId: string | null;
       description: string | null;
-      date: string;
-      start: string;
-      end: string;
+      startIso: string;
+      endIso: string;
     }) => d,
   )
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
-    const { start, end } = computeIsoTimes(data.date, data.start, data.end);
+    const { start, end } = validateIsoRange(data.startIso, data.endIso);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: before } = await supabaseAdmin
       .from("time_entries")
