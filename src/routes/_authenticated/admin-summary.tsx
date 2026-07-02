@@ -49,6 +49,7 @@ function AdminSummaryPage() {
   const [showEmployer, setShowEmployer] = useState(true);
   const [showBilling, setShowBilling] = useState(true);
   const [pdfBusy, setPdfBusy] = useState(false);
+  const [pdfDetail, setPdfDetail] = useState<"entries" | "daily">("entries");
 
   const usersQ = useQuery({
     queryKey: ["managed-users"],
