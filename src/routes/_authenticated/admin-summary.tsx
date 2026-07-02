@@ -32,6 +32,8 @@ function AdminSummaryPage() {
   const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0, 10);
   const [from, setFrom] = useState(firstOfMonth);
   const [to, setTo] = useState(today.toISOString().slice(0, 10));
+  const [fromTime, setFromTime] = useState("00:00");
+  const [toTime, setToTime] = useState("00:00");
   const [userId, setUserId] = useState<string>("all");
   const [clientId, setClientId] = useState<string>("all");
   const [projectId, setProjectId] = useState<string>("all");
@@ -71,11 +73,11 @@ function AdminSummaryPage() {
   }, [projectsQ.data, clientId]);
 
   const summaryQ = useQuery({
-    queryKey: ["admin-summary", from, to, userId, clientId, projectId],
+    queryKey: ["admin-summary", from, to, fromTime, toTime, userId, clientId, projectId],
     enabled: !!adminQ.data?.isAdmin,
     queryFn: () => fetchSummary({
       data: {
-        from, to,
+        from, to, fromTime, toTime,
         userId: userId === "all" ? null : userId,
         clientId: clientId === "all" ? null : clientId,
         projectId: projectId === "all" ? null : projectId,
@@ -112,7 +114,8 @@ function AdminSummaryPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `sammanstallning-${from}_${to}.csv`;
+    const timeSuffix = (fromTime !== "00:00" || toTime !== "00:00") ? `_${fromTime}-${toTime}` : "";
+    a.download = `sammanstallning-${from}_${to}${timeSuffix}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }
