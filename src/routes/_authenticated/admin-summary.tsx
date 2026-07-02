@@ -32,6 +32,8 @@ function AdminSummaryPage() {
   const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0, 10);
   const [from, setFrom] = useState(firstOfMonth);
   const [to, setTo] = useState(today.toISOString().slice(0, 10));
+  const [fromTime, setFromTime] = useState("00:00");
+  const [toTime, setToTime] = useState("00:00");
   const [userId, setUserId] = useState<string>("all");
   const [clientId, setClientId] = useState<string>("all");
   const [projectId, setProjectId] = useState<string>("all");
@@ -71,11 +73,11 @@ function AdminSummaryPage() {
   }, [projectsQ.data, clientId]);
 
   const summaryQ = useQuery({
-    queryKey: ["admin-summary", from, to, userId, clientId, projectId],
+    queryKey: ["admin-summary", from, to, fromTime, toTime, userId, clientId, projectId],
     enabled: !!adminQ.data?.isAdmin,
     queryFn: () => fetchSummary({
       data: {
-        from, to,
+        from, to, fromTime, toTime,
         userId: userId === "all" ? null : userId,
         clientId: clientId === "all" ? null : clientId,
         projectId: projectId === "all" ? null : projectId,
@@ -112,7 +114,8 @@ function AdminSummaryPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `sammanstallning-${from}_${to}.csv`;
+    const timeSuffix = (fromTime !== "00:00" || toTime !== "00:00") ? `_${fromTime}-${toTime}` : "";
+    a.download = `sammanstallning-${from}_${to}${timeSuffix}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -140,7 +143,7 @@ function AdminSummaryPage() {
         ) : (
           <>
             <Card className="space-y-3 p-4">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div className="space-y-1">
                   <Label className="text-xs">Från</Label>
                   <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
@@ -148,6 +151,14 @@ function AdminSummaryPage() {
                 <div className="space-y-1">
                   <Label className="text-xs">Till</Label>
                   <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Från kl</Label>
+                  <Input type="time" value={fromTime} onChange={(e) => setFromTime(e.target.value || "00:00")} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Till kl</Label>
+                  <Input type="time" value={toTime} onChange={(e) => setToTime(e.target.value || "00:00")} />
                 </div>
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
