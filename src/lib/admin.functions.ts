@@ -869,6 +869,10 @@ export type SummaryRow = {
   ob2Ms?: number;
   ob3Ms?: number;
   amount?: number;
+  obAmount1?: number;
+  obAmount2?: number;
+  obAmount3?: number;
+  obAmount?: number;
   billing?: number;
   employerCost?: number;
   net?: number;
@@ -885,6 +889,7 @@ export type SummaryResult = {
   totalBilling: number;
   totalEmployerCost: number;
   totalNet: number;
+  totalObAmount: number;
   perClient: SummaryRow[];
   perProject: SummaryRow[];
   perUser: SummaryRow[];
@@ -1155,6 +1160,12 @@ export const getSummary = createServerFn({ method: "GET" })
       row.employerCost = (row.employerCost ?? 0) + employerCost;
       row.net = (row.net ?? 0) + net;
     };
+    const addObKr = (row: SummaryRow, o1: number, o2: number, o3: number) => {
+      row.obAmount1 = (row.obAmount1 ?? 0) + o1;
+      row.obAmount2 = (row.obAmount2 ?? 0) + o2;
+      row.obAmount3 = (row.obAmount3 ?? 0) + o3;
+      row.obAmount = (row.obAmount ?? 0) + o1 + o2 + o3;
+    };
 
     const perClient = new Map<string, SummaryRow>();
     const perProject = new Map<string, SummaryRow>();
@@ -1166,6 +1177,7 @@ export const getSummary = createServerFn({ method: "GET" })
     let totalBilling = 0;
     let totalEmployerCost = 0;
     let totalNet = 0;
+    let totalObAmount = 0;
 
     // Sortera så att ungdomsnedsättningens månadstak fylls i tidsordning per användare.
     facts.sort((a, b) => {
@@ -1197,6 +1209,11 @@ export const getSummary = createServerFn({ method: "GET" })
       runningGrossByUserMonth.set(gmKey, grossBeforeInMonth + amount);
       const netRate = netRateByUserMonth.get(`${f.userId}|${f.monthKey}`) ?? 0.7;
       const net = amount * netRate;
+      const wageForKr = wages.get(uidRow) ?? { hourly_rate: 0, ob1_pct: 0, ob2_pct: 0, ob3_pct: 0 };
+      const H_ = 3_600_000;
+      const obKr1 = wageForKr.hourly_rate * (wageForKr.ob1_pct / 100) * (split.ob1Ms / H_);
+      const obKr2 = wageForKr.hourly_rate * (wageForKr.ob2_pct / 100) * (split.ob2Ms / H_);
+      const obKr3 = wageForKr.hourly_rate * (wageForKr.ob3_pct / 100) * (split.ob3Ms / H_);
       totalSplit.normalMs += split.normalMs;
       totalSplit.ob1Ms += split.ob1Ms;
       totalSplit.ob2Ms += split.ob2Ms;
@@ -1204,6 +1221,7 @@ export const getSummary = createServerFn({ method: "GET" })
       totalAmount += amount;
       totalEmployerCost += employerCost;
       totalNet += net;
+      totalObAmount += obKr1 + obKr2 + obKr3;
 
       const proj = r.projects ?? null;
       const clientObj = proj?.clients ?? null;
@@ -1220,34 +1238,37 @@ export const getSummary = createServerFn({ method: "GET" })
       const clientKey = clientObj?.id ?? proj?.client ?? "__none__";
       const clientLabel = clientObj?.name ?? proj?.client ?? "Ingen kund";
       const pc = perClient.get(clientKey);
-      if (pc) { pc.ms += ms; pc.count += 1; addInto(pc, split, amount, billing, employerCost, net); }
+      if (pc) { pc.ms += ms; pc.count += 1; addInto(pc, split, amount, billing, employerCost, net); addObKr(pc, obKr1, obKr2, obKr3); }
       else {
         const row: SummaryRow = { key: clientKey, label: clientLabel, ms, count: 1 };
         addInto(row, split, amount, billing, employerCost, net);
+        addObKr(row, obKr1, obKr2, obKr3);
         perClient.set(clientKey, row);
       }
 
       const projKey = proj?.id ?? "__none__";
       const projLabel = proj?.name ?? "Inget projekt";
       const pp = perProject.get(projKey);
-      if (pp) { pp.ms += ms; pp.count += 1; addInto(pp, split, amount, billing, employerCost, net); }
+      if (pp) { pp.ms += ms; pp.count += 1; addInto(pp, split, amount, billing, employerCost, net); addObKr(pp, obKr1, obKr2, obKr3); }
       else {
         const row: SummaryRow = {
           key: projKey, label: projLabel, sublabel: clientLabel,
           color: proj?.color ?? null, ms, count: 1,
         };
         addInto(row, split, amount, billing, employerCost, net);
+        addObKr(row, obKr1, obKr2, obKr3);
         perProject.set(projKey, row);
       }
 
       const uid = r.user_id as string;
       const pu = perUser.get(uid);
-      if (pu) { pu.ms += ms; pu.count += 1; addInto(pu, split, amount, billing, employerCost, net); }
+      if (pu) { pu.ms += ms; pu.count += 1; addInto(pu, split, amount, billing, employerCost, net); addObKr(pu, obKr1, obKr2, obKr3); }
       else {
         const emailForUid = emails.get(uid) ?? null;
         const uidLabel = firstNames.get(uid) || (emailForUid ? emailForUid.split("@")[0] : uid);
         const row: SummaryRow = { key: uid, label: uidLabel, ms, count: 1 };
         addInto(row, split, amount, billing, employerCost, net);
+        addObKr(row, obKr1, obKr2, obKr3);
         perUser.set(uid, row);
       }
     }
@@ -1264,6 +1285,7 @@ export const getSummary = createServerFn({ method: "GET" })
       totalBilling,
       totalEmployerCost,
       totalNet,
+      totalObAmount,
       perClient: Array.from(perClient.values()).sort(sortDesc),
       perProject: Array.from(perProject.values()).sort(sortDesc),
       perUser: Array.from(perUser.values()).sort(sortDesc),

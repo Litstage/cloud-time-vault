@@ -222,7 +222,7 @@ function AdminSummaryPage() {
       const totalsRows: [string, string][] = [
         ["Total tid", `${fmtH(s.totalMs)} h (${s.totalCount} poster)`],
       ];
-      if (showOb) totalsRows.push(["Normal / OB1 / OB2 / OB3", `${fmtH(s.totalNormalMs)} / ${fmtH(s.totalOb1Ms)} / ${fmtH(s.totalOb2Ms)} / ${fmtH(s.totalOb3Ms)} h`]);
+      if (showOb) totalsRows.push(["OB-tillägg (kr)", `${fmtKr(s.totalObAmount)} kr`]);
       if (showGross) totalsRows.push(["Bruttolön", `${fmtKr(s.totalAmount)} kr`]);
       if (showNet) totalsRows.push(["Netto efter skatt", `${fmtKr(s.totalNet)} kr`]);
       if (showEmployer) totalsRows.push(["Arbetsgivarkostnad", `${fmtKr(s.totalEmployerCost)} kr`]);
@@ -419,7 +419,7 @@ function AdminSummaryPage() {
                       <CostToggle label="Netto efter skatt" checked={showNet} onChange={setShowNet} />
                       <CostToggle label="Arbetsgivarkostnad" checked={showEmployer} onChange={setShowEmployer} />
                       <CostToggle label="Debitering kund" checked={showBilling} onChange={setShowBilling} />
-                      <CostToggle label="OB-timmar" checked={showOb} onChange={setShowOb} />
+                      <CostToggle label="OB (kr)" checked={showOb} onChange={setShowOb} />
                       <div className="border-t pt-2">
                         <div className="mb-1 text-xs font-medium text-muted-foreground">Kategorier</div>
                         <CostToggle label="Per kund" checked={showPerClient} onChange={setShowPerClient} />
@@ -458,9 +458,9 @@ function AdminSummaryPage() {
                   {showOb && (
                     <div className="grid grid-cols-2 gap-2 rounded-md bg-muted/40 p-3 text-xs sm:grid-cols-4">
                       <Stat label="Normal" value={`${fmtHours(s.totalNormalMs)} h`} />
-                      <Stat label="OB1" value={`${fmtHours(s.totalOb1Ms)} h`} />
-                      <Stat label="OB2" value={`${fmtHours(s.totalOb2Ms)} h`} />
-                      <Stat label="OB3" value={`${fmtHours(s.totalOb3Ms)} h`} />
+                      <Stat label="OB-tillägg" value={`${fmtKr(s.totalObAmount)} kr`} />
+                      <Stat label="OB-timmar" value={`${fmtHours(s.totalOb1Ms + s.totalOb2Ms + s.totalOb3Ms)} h`} />
+                      <Stat label="Andel OB" value={`${s.totalMs > 0 ? (((s.totalOb1Ms + s.totalOb2Ms + s.totalOb3Ms) / s.totalMs) * 100).toFixed(1) : "0.0"}%`} />
                     </div>
                   )}
                   {(showGross || showNet || showEmployer || showBilling) && (
@@ -580,9 +580,10 @@ function SummarySection({ title, rows, loading, totalMs, showSwatch, showAmount,
                 {showOb && (
                   <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
                     <span>Normal {fmtHours(r.normalMs ?? 0)} h</span>
-                    <span>OB1 {fmtHours(r.ob1Ms ?? 0)} h</span>
-                    <span>OB2 {fmtHours(r.ob2Ms ?? 0)} h</span>
-                    <span>OB3 {fmtHours(r.ob3Ms ?? 0)} h</span>
+                    <span>OB1 {fmtKr(r.obAmount1 ?? 0)} kr</span>
+                    <span>OB2 {fmtKr(r.obAmount2 ?? 0)} kr</span>
+                    <span>OB3 {fmtKr(r.obAmount3 ?? 0)} kr</span>
+                    <span className="font-medium text-foreground">Totalt OB {fmtKr(r.obAmount ?? 0)} kr</span>
                   </div>
                 )}
                 <div className="h-1.5 overflow-hidden rounded-full bg-muted">
