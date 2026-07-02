@@ -287,17 +287,21 @@ function AdminPage() {
 
   const [newEmail, setNewEmail] = useState("");
   const [newPhone, setNewPhone] = useState("");
+  const [newFirstName, setNewFirstName] = useState("");
+  const [newLastName, setNewLastName] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [newMakeAdmin, setNewMakeAdmin] = useState(false);
 
   const createMut = useMutation({
-    mutationFn: (v: { email: string; password: string; phone: string; makeAdmin: boolean }) =>
-      createUser({ data: { email: v.email, password: v.password, phone: v.phone, approve: true, makeAdmin: v.makeAdmin } }),
+    mutationFn: (v: { email: string; password: string; phone: string; firstName: string; lastName: string; makeAdmin: boolean }) =>
+      createUser({ data: { email: v.email, password: v.password, phone: v.phone, firstName: v.firstName, lastName: v.lastName, approve: true, makeAdmin: v.makeAdmin } }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["managed-users"] });
       toast.success("Användare skapad och godkänd");
       setNewEmail("");
       setNewPhone("");
+      setNewFirstName("");
+      setNewLastName("");
       setNewPassword("");
       setNewMakeAdmin(false);
     },
@@ -307,6 +311,8 @@ function AdminPage() {
   const [editing, setEditing] = useState<ManagedUser | null>(null);
   const [editEmail, setEditEmail] = useState("");
   const [editPhone, setEditPhone] = useState("");
+  const [editFirstName, setEditFirstName] = useState("");
+  const [editLastName, setEditLastName] = useState("");
   const [editPassword, setEditPassword] = useState("");
   const [editHourly, setEditHourly] = useState("0");
   const [editOb1, setEditOb1] = useState("0");
@@ -314,7 +320,7 @@ function AdminPage() {
   const [editOb3, setEditOb3] = useState("0");
 
   const updateMut = useMutation({
-    mutationFn: (v: { userId: string; email?: string; phone?: string; password?: string }) =>
+    mutationFn: (v: { userId: string; email?: string; phone?: string; firstName?: string; lastName?: string; password?: string }) =>
       updateUser({ data: v }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["managed-users"] });
