@@ -334,21 +334,35 @@ function AdminProjectsPage() {
                 Kunder ({clientsQ.data?.length ?? 0})
               </h2>
               <Card className="space-y-3 p-4">
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   <Input placeholder="Kundnamn" value={newClientName} onChange={(e) => setNewClientName(e.target.value)} />
                   <Input placeholder="Anteckning (valfritt)" value={newClientNote} onChange={(e) => setNewClientNote(e.target.value)} />
+                </div>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                   <Input
                     placeholder="Timdebitering (kr/h)"
                     inputMode="decimal"
                     value={newClientRate}
                     onChange={(e) => setNewClientRate(e.target.value)}
                   />
+                  <Input
+                    placeholder="OB1 22–07 (kr/h)"
+                    inputMode="decimal"
+                    value={newClientOb1}
+                    onChange={(e) => setNewClientOb1(e.target.value)}
+                  />
+                  <Input
+                    placeholder="OB2 helg (kr/h)"
+                    inputMode="decimal"
+                    value={newClientOb2}
+                    onChange={(e) => setNewClientOb2(e.target.value)}
+                  />
                 </div>
                 <div className="flex justify-end">
                   <Button
                     size="sm"
                     disabled={!newClientName.trim() || addClient.isPending}
-                    onClick={() => addClient.mutate({ name: newClientName, note: newClientNote, rate: newClientRate })}
+                    onClick={() => addClient.mutate({ name: newClientName, note: newClientNote, rate: newClientRate, ob1: newClientOb1, ob2: newClientOb2 })}
                   >
                     <Plus className="mr-1 h-4 w-4" /> Lägg till kund
                   </Button>
@@ -365,7 +379,9 @@ function AdminProjectsPage() {
                           <Input className="h-8 flex-1 min-w-[140px]" value={editClientName} onChange={(e) => setEditClientName(e.target.value)} />
                           <Input className="h-8 flex-1 min-w-[140px]" value={editClientNote} onChange={(e) => setEditClientNote(e.target.value)} placeholder="Anteckning" />
                           <Input className="h-8 w-32" value={editClientRate} onChange={(e) => setEditClientRate(e.target.value)} placeholder="kr/h" inputMode="decimal" />
-                          <Button size="sm" onClick={() => updateClient.mutate({ id: c.id, name: editClientName, note: editClientNote, rate: editClientRate })} disabled={updateClient.isPending}>
+                          <Input className="h-8 w-32" value={editClientOb1} onChange={(e) => setEditClientOb1(e.target.value)} placeholder="OB1 kr/h" inputMode="decimal" />
+                          <Input className="h-8 w-32" value={editClientOb2} onChange={(e) => setEditClientOb2(e.target.value)} placeholder="OB2 kr/h" inputMode="decimal" />
+                          <Button size="sm" onClick={() => updateClient.mutate({ id: c.id, name: editClientName, note: editClientNote, rate: editClientRate, ob1: editClientOb1, ob2: editClientOb2 })} disabled={updateClient.isPending}>
                             <Save className="mr-1 h-4 w-4" /> Spara
                           </Button>
                           <Button size="sm" variant="ghost" onClick={() => setEditingClient(null)}>
@@ -378,6 +394,8 @@ function AdminProjectsPage() {
                             <div className="text-sm font-medium">{c.name}</div>
                             <div className="text-xs text-muted-foreground">
                               {c.hourly_rate > 0 ? `${c.hourly_rate.toLocaleString("sv-SE")} kr/h` : "Ingen timdebitering"}
+                              {c.ob1_rate > 0 ? ` · OB1 ${c.ob1_rate.toLocaleString("sv-SE")}` : ""}
+                              {c.ob2_rate > 0 ? ` · OB2 ${c.ob2_rate.toLocaleString("sv-SE")}` : ""}
                               {c.note ? ` · ${c.note}` : ""}
                             </div>
                           </div>
