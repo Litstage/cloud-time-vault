@@ -231,11 +231,11 @@ function AdminSummaryPage() {
       };
 
       addSection("Per kund", ["Kund", "Timmar", ...costCols],
-        s.perClient.map((r) => [r.label, fmtHours(r.ms), ...rowCostCells(r)]));
+        s.perClient.map((r) => [r.label, fmtH(r.ms), ...rowCostCells(r)]));
       addSection("Per projekt", ["Projekt", "Kund", "Timmar", ...costCols],
-        s.perProject.map((r) => [r.label, r.sublabel ?? "", fmtHours(r.ms), ...rowCostCells(r)]));
+        s.perProject.map((r) => [r.label, r.sublabel ?? "", fmtH(r.ms), ...rowCostCells(r)]));
       addSection("Per användare", ["Användare", "Timmar", ...costCols],
-        s.perUser.map((r) => [r.label, fmtHours(r.ms), ...rowCostCells(r)]));
+        s.perUser.map((r) => [r.label, fmtH(r.ms), ...rowCostCells(r)]));
 
       const fmtDate = (iso: string) => new Date(iso).toLocaleDateString("sv-SE");
       const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" });
