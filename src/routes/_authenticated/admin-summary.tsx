@@ -385,6 +385,9 @@ function AdminSummaryPage() {
                       <CostToggle label="Arbetsgivarkostnad" checked={showEmployer} onChange={setShowEmployer} />
                       <CostToggle label="Debitering kund" checked={showBilling} onChange={setShowBilling} />
                       <div className="border-t pt-2">
+                        <CostToggle label="Avrunda timmar till heltimmar i PDF" checked={roundPdfHours} onChange={setRoundPdfHours} />
+                      </div>
+                      <div className="border-t pt-2">
                         <div className="mb-1 text-xs font-medium text-muted-foreground">Specifikation i PDF</div>
                         <label className="flex cursor-pointer items-center gap-2 text-sm">
                           <input type="radio" name="pdfDetail" checked={pdfDetail === "entries"} onChange={() => setPdfDetail("entries")} />
