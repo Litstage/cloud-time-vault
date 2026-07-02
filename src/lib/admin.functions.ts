@@ -11,6 +11,7 @@ export type AdminEntry = {
   start_time: string;
   end_time: string | null;
   description: string | null;
+  project_id: string | null;
   project_name: string | null;
   project_color: string | null;
 };
@@ -324,7 +325,7 @@ export const getAllTimeEntries = createServerFn({ method: "GET" })
 
     let q = supabaseAdmin
       .from("time_entries")
-      .select("id, user_id, description, start_time, end_time, projects(name, color)")
+      .select("id, user_id, description, start_time, end_time, project_id, projects(name, color)")
       .order("start_time", { ascending: false })
       .limit(5000);
     if (data.from) q = q.gte("start_time", data.from);
@@ -365,6 +366,7 @@ export const getAllTimeEntries = createServerFn({ method: "GET" })
         start_time: r.start_time as string,
         end_time: (r.end_time as string | null) ?? null,
         description: (r.description as string | null) ?? null,
+        project_id: (r.project_id as string | null) ?? null,
         project_name: proj?.name ?? null,
         project_color: proj?.color ?? null,
       };
