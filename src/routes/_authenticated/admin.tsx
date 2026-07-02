@@ -442,6 +442,7 @@ function AdminPage() {
     setEditHourly("0"); setEditOb1("0"); setEditOb2("0"); setEditOb3("0");
     setEditEmployerFee("31.42"); setEditTax("30");
     setEditTaxTableNumber("32"); setEditTaxTableColumn("1");
+    setEditPersonalNumber("");
     fetchWage({ data: { userId: u.user_id } })
       .then((w) => {
         setEditHourly(String(w.hourly_rate));
@@ -452,6 +453,7 @@ function AdminPage() {
         setEditTax(String(w.tax_pct));
         setEditTaxTableNumber(String(w.tax_table_number));
         setEditTaxTableColumn(String(w.tax_table_column));
+        setEditPersonalNumber(w.personal_number ?? "");
       })
       .catch(() => {});
   }
@@ -1106,6 +1108,7 @@ function AdminPage() {
                   tax_pct: Number(editTax) || 0,
                   tax_table_number: Math.max(29, Math.min(40, Number(editTaxTableNumber) || 32)),
                   tax_table_column: Math.max(1, Math.min(6, Number(editTaxTableColumn) || 1)),
+                  personal_number: editPersonalNumber.trim() ? editPersonalNumber.trim() : null,
                 });
                 updateMut.mutate(payload);
               }}
