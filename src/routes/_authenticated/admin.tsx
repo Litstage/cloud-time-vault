@@ -651,17 +651,42 @@ function AdminPage() {
                 <h2 className="text-sm font-medium text-muted-foreground">
                   Alla poster ({rows.length})
                 </h2>
-                <Button
-                  size="sm"
-                  onClick={() => { setEditingEntry(null); setEntryDialogOpen(true); }}
-                >
-                  <Plus className="mr-1 h-4 w-4" /> Lägg till tid
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={selectedIds.size === 0}
+                    onClick={() => {
+                      setCopyMode("copy");
+                      setCopyTargets(new Set());
+                      setCopyOpen(true);
+                    }}
+                  >
+                    <Copy className="mr-1 h-4 w-4" /> Kopiera/Flytta ({selectedIds.size})
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => { setEditingEntry(null); setEntryDialogOpen(true); }}
+                  >
+                    <Plus className="mr-1 h-4 w-4" /> Lägg till tid
+                  </Button>
+                </div>
               </div>
               <Card className="overflow-x-auto p-0">
                 <table className="w-full text-sm">
                   <thead className="bg-muted/50 text-left text-xs uppercase text-muted-foreground">
                     <tr>
+                      <th className="px-3 py-2 w-8">
+                        <input
+                          type="checkbox"
+                          aria-label="Markera alla"
+                          checked={rows.length > 0 && rows.every((r) => selectedIds.has(r.id))}
+                          onChange={(e) => {
+                            if (e.target.checked) setSelectedIds(new Set(rows.map((r) => r.id)));
+                            else setSelectedIds(new Set());
+                          }}
+                        />
+                      </th>
                       <th className="px-3 py-2">Användare</th>
                       <th className="px-3 py-2">Datum</th>
                       <th className="px-3 py-2">Projekt</th>
@@ -677,6 +702,21 @@ function AdminPage() {
                         : 0;
                       return (
                         <tr key={r.id}>
+                          <td className="px-3 py-2">
+                            <input
+                              type="checkbox"
+                              aria-label="Markera rad"
+                              checked={selectedIds.has(r.id)}
+                              onChange={(e) => {
+                                setSelectedIds((prev) => {
+                                  const next = new Set(prev);
+                                  if (e.target.checked) next.add(r.id);
+                                  else next.delete(r.id);
+                                  return next;
+                                });
+                              }}
+                            />
+                          </td>
                           <td className="px-3 py-2 truncate max-w-[10rem]">{r.user_email ?? r.user_id}</td>
                           <td className="px-3 py-2 whitespace-nowrap">
                             {new Date(r.start_time).toLocaleDateString("sv-SE")}
