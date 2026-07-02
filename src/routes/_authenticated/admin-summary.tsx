@@ -74,7 +74,7 @@ function AdminSummaryPage() {
 
   const summaryQ = useQuery({
     queryKey: ["admin-summary", from, to, fromTime, toTime, userId, clientId, projectId],
-    enabled: !!adminQ.data?.isAdmin,
+    enabled: !!adminQ.data?.isAdmin && !!from && !!to,
     queryFn: () => fetchSummary({
       data: {
         from, to, fromTime, toTime,
