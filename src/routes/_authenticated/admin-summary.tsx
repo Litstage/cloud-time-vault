@@ -224,20 +224,40 @@ function AdminSummaryPage() {
 
       const fmtDate = (iso: string) => new Date(iso).toLocaleDateString("sv-SE");
       const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" });
-      addSection(
-        `Poster (${entries.length})`,
-        ["Datum", "Start", "Slut", "Användare", "Projekt", "Kund", "Beskrivning", "Timmar"],
-        entries.map((e) => [
-          fmtDate(e.start_time),
-          fmtTime(e.start_time),
-          fmtTime(e.end_time),
-          e.user_label,
-          e.project_name ?? "",
-          e.client_name ?? "",
-          e.description ?? "",
-          fmtHours(e.ms),
-        ]),
-      );
+      if (pdfDetail === "entries") {
+        addSection(
+          `Poster (${entries.length})`,
+          ["Datum", "Start", "Slut", "Användare", "Projekt", "Kund", "Beskrivning", "Timmar"],
+          entries.map((e) => [
+            fmtDate(e.start_time),
+            fmtTime(e.start_time),
+            fmtTime(e.end_time),
+            e.user_label,
+            e.project_name ?? "",
+            e.client_name ?? "",
+            e.description ?? "",
+            fmtHours(e.ms),
+          ]),
+        );
+      } else {
+        const agg = new Map<string, { date: string; user: string; ms: number; count: number }>();
+        for (const e of entries) {
+          const dateKey = fmtDate(e.start_time);
+          const key = `${dateKey}||${e.user_id}`;
+          const cur = agg.get(key);
+          if (cur) { cur.ms += e.ms; cur.count += 1; }
+          else agg.set(key, { date: dateKey, user: e.user_label, ms: e.ms, count: 1 });
+        }
+        const rows = Array.from(agg.values()).sort((a, b) => {
+          if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+          return a.user.localeCompare(b.user, "sv");
+        });
+        addSection(
+          `Summering per användare och dag (${rows.length})`,
+          ["Datum", "Användare", "Antal poster", "Timmar"],
+          rows.map((r) => [r.date, r.user, String(r.count), fmtHours(r.ms)]),
+        );
+      }
 
       const pageCount = doc.getNumberOfPages();
       for (let i = 1; i <= pageCount; i += 1) {
