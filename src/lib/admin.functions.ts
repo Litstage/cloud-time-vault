@@ -3,6 +3,30 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { splitEntryByOb, computePay, type ObRule, type ObSplit, type Wage } from "@/lib/ob";
 import { parsePersonalNumber, employerFeeForEntry } from "@/lib/employer-fee";
 
+// Billing split for clients: OB1 = 22:00–07:00 alla dagar, OB2 = hela lör/sön.
+// Helg (OB2) vinner över natt (OB1) vid överlapp.
+function splitEntryByBilling(startIso: string, endIso: string): { normalMs: number; billOb1Ms: number; billOb2Ms: number } {
+  const out = { normalMs: 0, billOb1Ms: 0, billOb2Ms: 0 };
+  const startMs = new Date(startIso).getTime();
+  const endMs = new Date(endIso).getTime();
+  if (!(endMs > startMs)) return out;
+  const MIN = 60_000;
+  let cursor = startMs;
+  while (cursor < endMs) {
+    const nextMinute = Math.floor(cursor / MIN) * MIN + MIN;
+    const next = Math.min(nextMinute, endMs);
+    const seg = next - cursor;
+    const d = new Date(cursor);
+    const wd = d.getDay(); // 0=Sun..6=Sat
+    const h = d.getHours();
+    if (wd === 0 || wd === 6) out.billOb2Ms += seg;
+    else if (h < 7 || h >= 22) out.billOb1Ms += seg;
+    else out.normalMs += seg;
+    cursor = next;
+  }
+  return out;
+}
+
 export type AdminEntry = {
   id: string;
   user_id: string;
@@ -887,7 +911,7 @@ export const getSummary = createServerFn({ method: "GET" })
 
     let q = supabaseAdmin
       .from("time_entries")
-      .select("id, user_id, start_time, end_time, project_id, projects(id, name, color, client_id, client, clients(id, name, hourly_rate))")
+      .select("id, user_id, start_time, end_time, project_id, projects(id, name, color, client_id, client, clients(id, name, hourly_rate, ob1_rate, ob2_rate))")
       .gte("start_time", fromIso)
       .lt("start_time", toIso)
       .not("end_time", "is", null)
@@ -1110,7 +1134,14 @@ export const getSummary = createServerFn({ method: "GET" })
       const proj = r.projects ?? null;
       const clientObj = proj?.clients ?? null;
       const clientRate = Number(clientObj?.hourly_rate ?? 0);
-      const billing = (ms / 3600000) * clientRate;
+      const ob1Rate = Number(clientObj?.ob1_rate ?? 0) || clientRate;
+      const ob2Rate = Number(clientObj?.ob2_rate ?? 0) || clientRate;
+      const billSplit = splitEntryByBilling(r.start_time as string, r.end_time as string);
+      const H = 3_600_000;
+      const billing =
+        (billSplit.normalMs / H) * clientRate +
+        (billSplit.billOb1Ms / H) * ob1Rate +
+        (billSplit.billOb2Ms / H) * ob2Rate;
       totalBilling += billing;
       const clientKey = clientObj?.id ?? proj?.client ?? "__none__";
       const clientLabel = clientObj?.name ?? proj?.client ?? "Ingen kund";

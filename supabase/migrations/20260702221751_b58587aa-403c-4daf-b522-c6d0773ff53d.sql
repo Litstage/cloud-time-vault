@@ -1,0 +1,1 @@
+ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS ob1_rate numeric NOT NULL DEFAULT 0; ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS ob2_rate numeric NOT NULL DEFAULT 0;

@@ -27,7 +27,7 @@ const COLORS = [
   "#06b6d4", "#3b82f6", "#6366f1", "#a855f7", "#ec4899",
 ];
 
-type Client = { id: string; name: string; note: string | null; hourly_rate: number };
+type Client = { id: string; name: string; note: string | null; hourly_rate: number; ob1_rate: number; ob2_rate: number };
 type Project = {
   id: string;
   name: string;
@@ -105,12 +105,14 @@ function AdminProjectsPage() {
     enabled: !!adminQ.data?.isAdmin,
     queryFn: async (): Promise<Client[]> => {
       const { data, error } = await (supabase.from("clients" as any) as any)
-        .select("id, name, note, hourly_rate")
+        .select("id, name, note, hourly_rate, ob1_rate, ob2_rate")
         .order("name");
       if (error) throw error;
       return ((data ?? []) as any[]).map((c) => ({
         id: c.id, name: c.name, note: c.note,
         hourly_rate: Number(c.hourly_rate ?? 0),
+        ob1_rate: Number(c.ob1_rate ?? 0),
+        ob2_rate: Number(c.ob2_rate ?? 0),
       })) as Client[];
     },
   });
@@ -132,36 +134,54 @@ function AdminProjectsPage() {
   const [newClientName, setNewClientName] = useState("");
   const [newClientNote, setNewClientNote] = useState("");
   const [newClientRate, setNewClientRate] = useState("");
+  const [newClientOb1, setNewClientOb1] = useState("");
+  const [newClientOb2, setNewClientOb2] = useState("");
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [editClientName, setEditClientName] = useState("");
   const [editClientNote, setEditClientNote] = useState("");
   const [editClientRate, setEditClientRate] = useState("");
+  const [editClientOb1, setEditClientOb1] = useState("");
+  const [editClientOb2, setEditClientOb2] = useState("");
 
   const addClient = useMutation({
-    mutationFn: async (v: { name: string; note: string; rate: string }) => {
-      const rate = v.rate.trim() === "" ? 0 : Number(v.rate.replace(",", "."));
-      if (!Number.isFinite(rate) || rate < 0) throw new Error("Ogiltig timdebitering");
+    mutationFn: async (v: { name: string; note: string; rate: string; ob1: string; ob2: string }) => {
+      const parseRate = (s: string, label: string) => {
+        const n = s.trim() === "" ? 0 : Number(s.replace(",", "."));
+        if (!Number.isFinite(n) || n < 0) throw new Error(`Ogiltigt värde: ${label}`);
+        return n;
+      };
+      const rate = parseRate(v.rate, "timdebitering");
+      const ob1 = parseRate(v.ob1, "OB1-pris");
+      const ob2 = parseRate(v.ob2, "OB2-pris");
       const { error } = await (supabase.from("clients" as any) as any).insert({
         name: v.name.trim(),
         note: v.note.trim() || null,
         hourly_rate: rate,
+        ob1_rate: ob1,
+        ob2_rate: ob2,
       });
       if (error) throw new Error(error.message);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["clients"] });
-      setNewClientName(""); setNewClientNote(""); setNewClientRate("");
+      setNewClientName(""); setNewClientNote(""); setNewClientRate(""); setNewClientOb1(""); setNewClientOb2("");
       toast.success("Kund tillagd");
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const updateClient = useMutation({
-    mutationFn: async (v: { id: string; name: string; note: string; rate: string }) => {
-      const rate = v.rate.trim() === "" ? 0 : Number(v.rate.replace(",", "."));
-      if (!Number.isFinite(rate) || rate < 0) throw new Error("Ogiltig timdebitering");
+    mutationFn: async (v: { id: string; name: string; note: string; rate: string; ob1: string; ob2: string }) => {
+      const parseRate = (s: string, label: string) => {
+        const n = s.trim() === "" ? 0 : Number(s.replace(",", "."));
+        if (!Number.isFinite(n) || n < 0) throw new Error(`Ogiltigt värde: ${label}`);
+        return n;
+      };
+      const rate = parseRate(v.rate, "timdebitering");
+      const ob1 = parseRate(v.ob1, "OB1-pris");
+      const ob2 = parseRate(v.ob2, "OB2-pris");
       const { error } = await (supabase.from("clients" as any) as any)
-        .update({ name: v.name.trim(), note: v.note.trim() || null, hourly_rate: rate })
+        .update({ name: v.name.trim(), note: v.note.trim() || null, hourly_rate: rate, ob1_rate: ob1, ob2_rate: ob2 })
         .eq("id", v.id);
       if (error) throw new Error(error.message);
     },
@@ -285,6 +305,8 @@ function AdminProjectsPage() {
     setEditClientName(c.name);
     setEditClientNote(c.note ?? "");
     setEditClientRate(c.hourly_rate ? String(c.hourly_rate) : "");
+    setEditClientOb1(c.ob1_rate ? String(c.ob1_rate) : "");
+    setEditClientOb2(c.ob2_rate ? String(c.ob2_rate) : "");
   }
 
   return (
@@ -312,21 +334,35 @@ function AdminProjectsPage() {
                 Kunder ({clientsQ.data?.length ?? 0})
               </h2>
               <Card className="space-y-3 p-4">
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   <Input placeholder="Kundnamn" value={newClientName} onChange={(e) => setNewClientName(e.target.value)} />
                   <Input placeholder="Anteckning (valfritt)" value={newClientNote} onChange={(e) => setNewClientNote(e.target.value)} />
+                </div>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                   <Input
                     placeholder="Timdebitering (kr/h)"
                     inputMode="decimal"
                     value={newClientRate}
                     onChange={(e) => setNewClientRate(e.target.value)}
                   />
+                  <Input
+                    placeholder="OB1 22–07 (kr/h)"
+                    inputMode="decimal"
+                    value={newClientOb1}
+                    onChange={(e) => setNewClientOb1(e.target.value)}
+                  />
+                  <Input
+                    placeholder="OB2 helg (kr/h)"
+                    inputMode="decimal"
+                    value={newClientOb2}
+                    onChange={(e) => setNewClientOb2(e.target.value)}
+                  />
                 </div>
                 <div className="flex justify-end">
                   <Button
                     size="sm"
                     disabled={!newClientName.trim() || addClient.isPending}
-                    onClick={() => addClient.mutate({ name: newClientName, note: newClientNote, rate: newClientRate })}
+                    onClick={() => addClient.mutate({ name: newClientName, note: newClientNote, rate: newClientRate, ob1: newClientOb1, ob2: newClientOb2 })}
                   >
                     <Plus className="mr-1 h-4 w-4" /> Lägg till kund
                   </Button>
@@ -343,7 +379,9 @@ function AdminProjectsPage() {
                           <Input className="h-8 flex-1 min-w-[140px]" value={editClientName} onChange={(e) => setEditClientName(e.target.value)} />
                           <Input className="h-8 flex-1 min-w-[140px]" value={editClientNote} onChange={(e) => setEditClientNote(e.target.value)} placeholder="Anteckning" />
                           <Input className="h-8 w-32" value={editClientRate} onChange={(e) => setEditClientRate(e.target.value)} placeholder="kr/h" inputMode="decimal" />
-                          <Button size="sm" onClick={() => updateClient.mutate({ id: c.id, name: editClientName, note: editClientNote, rate: editClientRate })} disabled={updateClient.isPending}>
+                          <Input className="h-8 w-32" value={editClientOb1} onChange={(e) => setEditClientOb1(e.target.value)} placeholder="OB1 kr/h" inputMode="decimal" />
+                          <Input className="h-8 w-32" value={editClientOb2} onChange={(e) => setEditClientOb2(e.target.value)} placeholder="OB2 kr/h" inputMode="decimal" />
+                          <Button size="sm" onClick={() => updateClient.mutate({ id: c.id, name: editClientName, note: editClientNote, rate: editClientRate, ob1: editClientOb1, ob2: editClientOb2 })} disabled={updateClient.isPending}>
                             <Save className="mr-1 h-4 w-4" /> Spara
                           </Button>
                           <Button size="sm" variant="ghost" onClick={() => setEditingClient(null)}>
@@ -356,6 +394,8 @@ function AdminProjectsPage() {
                             <div className="text-sm font-medium">{c.name}</div>
                             <div className="text-xs text-muted-foreground">
                               {c.hourly_rate > 0 ? `${c.hourly_rate.toLocaleString("sv-SE")} kr/h` : "Ingen timdebitering"}
+                              {c.ob1_rate > 0 ? ` · OB1 ${c.ob1_rate.toLocaleString("sv-SE")}` : ""}
+                              {c.ob2_rate > 0 ? ` · OB2 ${c.ob2_rate.toLocaleString("sv-SE")}` : ""}
                               {c.note ? ` · ${c.note}` : ""}
                             </div>
                           </div>
