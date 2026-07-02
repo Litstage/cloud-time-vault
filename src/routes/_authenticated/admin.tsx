@@ -331,7 +331,7 @@ function AdminPage() {
   const createEntryMut = useMutation({
     mutationFn: (v: {
       userId: string; projectId: string | null; description: string | null;
-      date: string; start: string; end: string;
+      startIso: string; endIso: string;
     }) => createEntryFn({ data: v }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-entries"] });
@@ -346,7 +346,7 @@ function AdminPage() {
   const updateEntryMut = useMutation({
     mutationFn: (v: {
       id: string; projectId: string | null; description: string | null;
-      date: string; start: string; end: string;
+      startIso: string; endIso: string;
     }) => updateEntryFn({ data: v }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-entries"] });
