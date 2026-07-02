@@ -435,6 +435,9 @@ function AdminSummaryPage() {
                   <Button onClick={exportCsv} variant="outline" size="sm" disabled={!summaryQ.data}>
                     <Download className="mr-2 h-4 w-4" /> CSV
                   </Button>
+                  <Button onClick={previewPdf} variant="outline" size="sm" disabled={!summaryQ.data || pdfBusy}>
+                    <Eye className="mr-2 h-4 w-4" /> Förhandsgranska
+                  </Button>
                   <Button onClick={exportPdf} variant="outline" size="sm" disabled={!summaryQ.data || pdfBusy}>
                     <FileText className="mr-2 h-4 w-4" /> {pdfBusy ? "PDF…" : "PDF"}
                   </Button>
@@ -466,6 +469,30 @@ function AdminSummaryPage() {
           </>
         )}
       </main>
+      <Dialog open={!!previewUrl} onOpenChange={(open) => { if (!open) closePreview(); }}>
+        <DialogContent className="max-w-5xl">
+          <DialogHeader>
+            <DialogTitle>Förhandsgranskning – {previewFilename}</DialogTitle>
+          </DialogHeader>
+          {previewUrl && (
+            <iframe src={previewUrl} title="PDF-förhandsgranskning" className="h-[75vh] w-full rounded border" />
+          )}
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={closePreview}>Stäng</Button>
+            <Button
+              onClick={() => {
+                if (!previewUrl) return;
+                const a = document.createElement("a");
+                a.href = previewUrl;
+                a.download = previewFilename;
+                a.click();
+              }}
+            >
+              <Download className="mr-2 h-4 w-4" /> Ladda ner
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
