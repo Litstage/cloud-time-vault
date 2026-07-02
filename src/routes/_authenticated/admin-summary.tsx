@@ -377,6 +377,17 @@ function AdminSummaryPage() {
                       <CostToggle label="Netto efter skatt" checked={showNet} onChange={setShowNet} />
                       <CostToggle label="Arbetsgivarkostnad" checked={showEmployer} onChange={setShowEmployer} />
                       <CostToggle label="Debitering kund" checked={showBilling} onChange={setShowBilling} />
+                      <div className="border-t pt-2">
+                        <div className="mb-1 text-xs font-medium text-muted-foreground">Specifikation i PDF</div>
+                        <label className="flex cursor-pointer items-center gap-2 text-sm">
+                          <input type="radio" name="pdfDetail" checked={pdfDetail === "entries"} onChange={() => setPdfDetail("entries")} />
+                          <span>Alla tidsposter</span>
+                        </label>
+                        <label className="flex cursor-pointer items-center gap-2 text-sm">
+                          <input type="radio" name="pdfDetail" checked={pdfDetail === "daily"} onChange={() => setPdfDetail("daily")} />
+                          <span>Per användare och dag</span>
+                        </label>
+                      </div>
                     </PopoverContent>
                   </Popover>
                   <Button onClick={exportCsv} variant="outline" size="sm" disabled={!summaryQ.data}>
