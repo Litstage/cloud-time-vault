@@ -169,6 +169,7 @@ function AdminSummaryPage() {
       const clientsMap = new Map(clientsQ.data?.map((c) => [c.id, c.name]) ?? []);
       const projectsMap = new Map(projectsQ.data?.map((p) => [p.id, p.name]) ?? []);
       const timeSuffix = (fromTime !== "00:00" || toTime !== "00:00") ? ` ${fromTime}–${toTime}` : "";
+      const fmtH = (ms: number) => roundPdfHours ? fmtRoundedHours(ms) : fmtHours(ms);
 
       doc.setFontSize(16);
       doc.text("Sammanställning", 40, 40);
@@ -179,6 +180,7 @@ function AdminSummaryPage() {
         `Kund: ${clientId === "all" ? "Alla" : (clientsMap.get(clientId) ?? clientId)}`,
         `Projekt: ${projectId === "all" ? "Alla" : (projectsMap.get(projectId) ?? projectId)}`,
       ];
+      if (roundPdfHours) filterLines.push("Tider är avrundade till närmaste heltimme.");
       doc.text(filterLines, 40, 58);
 
       const totalsRows: [string, string][] = [
