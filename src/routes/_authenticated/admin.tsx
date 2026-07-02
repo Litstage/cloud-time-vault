@@ -528,7 +528,7 @@ function AdminPage() {
   return (
     <div className="min-h-screen bg-background pb-12">
       <header className="sticky top-0 z-10 border-b bg-background/80 backdrop-blur">
-        <div className="mx-auto flex max-w-3xl items-center gap-2 px-4 py-3">
+        <div className="mx-auto flex max-w-5xl items-center gap-2 px-4 py-3">
           <Button asChild variant="ghost" size="icon">
             <Link to="/">
               <ArrowLeft className="h-5 w-5" />
@@ -538,7 +538,7 @@ function AdminPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-3xl space-y-6 px-4 pt-6">
+      <main className="mx-auto max-w-5xl space-y-6 px-4 pt-6">
         {adminQ.isLoading ? (
           <Card className="p-6 text-center text-sm text-muted-foreground">Laddar…</Card>
         ) : !adminQ.data?.isAdmin ? (
