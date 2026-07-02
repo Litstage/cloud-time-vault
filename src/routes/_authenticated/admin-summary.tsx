@@ -152,7 +152,7 @@ function AdminSummaryPage() {
 
       const doc = new jsPDF({ unit: "pt", format: "a4" });
       const s = summaryQ.data;
-      const usersMap = new Map(usersQ.data?.map((u) => [u.user_id, u.email ?? u.user_id]) ?? []);
+      const usersMap = new Map(usersQ.data?.map((u) => [u.user_id, firstNameOf(u)]) ?? []);
       const clientsMap = new Map(clientsQ.data?.map((c) => [c.id, c.name]) ?? []);
       const projectsMap = new Map(projectsQ.data?.map((p) => [p.id, p.name]) ?? []);
       const timeSuffix = (fromTime !== "00:00" || toTime !== "00:00") ? ` ${fromTime}–${toTime}` : "";
