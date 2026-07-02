@@ -552,7 +552,7 @@ function HomePage() {
                         <Button variant="ghost" size="icon" onClick={() => { setEditEntry(e); setManualOpen(true); }}>
                           <Pencil className="h-4 w-4 text-muted-foreground" />
                         </Button>
-                        <Button variant="ghost" size="icon" onClick={() => deleteEntry(e.id)}>
+                        <Button variant="ghost" size="icon" onClick={() => deleteEntry(e)}>
                           <Trash2 className="h-4 w-4 text-muted-foreground" />
                         </Button>
                       </div>
