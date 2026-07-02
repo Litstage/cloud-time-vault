@@ -1067,7 +1067,7 @@ function AdminPage() {
                     <Label className="text-xs">Arbetsgivaravgift (%)</Label>
                     <Input type="number" step="0.01" value={editEmployerFee} onChange={(e) => setEditEmployerFee(e.target.value)} />
                     <div className="text-[11px] text-muted-foreground">
-                      Ignoreras om personnummer angetts – då används 0 / 10,21 / 31,42 % beroende på ålder.
+                      Ignoreras om personnummer angetts – då beräknas 0 / 10,21 / 20,81 / 31,42 % automatiskt utifrån ålder och utbetalningsdatum (ungdomsnedsättning 19–23 år, 1 apr 2026 – 30 sep 2027, lönetak 25 000 kr/mån).
                     </div>
                   </div>
                   <div className="space-y-1">

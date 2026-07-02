@@ -9,6 +9,18 @@ export const FULL_EMPLOYER_FEE_PCT = 31.42;
 export const REDUCED_EMPLOYER_FEE_PCT = 10.21;
 
 /**
+ * Tillfällig nedsättning av arbetsgivaravgifter för unga 19–23 år.
+ * Gäller ersättning som betalas ut 2026-04-01 – 2027-09-30, för personer
+ * som vid årets ingång fyllt 18 men inte 23 år (för 2026 = födda 2003–2007).
+ * På lön upp till 25 000 kr/mån betalas 20,81 % (ålderspensionsavgift +
+ * hälften av övriga avgifter). Överskjutande del: full avgift 31,42 %.
+ */
+export const YOUTH_REDUCED_PCT = 20.81;
+export const YOUTH_SALARY_CAP = 25000;
+export const YOUTH_PERIOD_START = new Date(Date.UTC(2026, 3, 1)); // 2026-04-01
+export const YOUTH_PERIOD_END = new Date(Date.UTC(2027, 8, 30, 23, 59, 59)); // 2027-09-30
+
+/**
  * Parsar ett svenskt personnummer (10 eller 12 siffror, valfritt bindestreck/plus)
  * och returnerar födelsedatumet, eller null om det inte går att tolka.
  * Sekelbestämning: 12 siffror används direkt; för 10 siffror antas 1900-talet
@@ -76,4 +88,53 @@ export function employerFeePctForAge(birth: Date, workDate: Date): number {
   if (age > 87) return 0;
   if (age >= 66) return REDUCED_EMPLOYER_FEE_PCT;
   return FULL_EMPLOYER_FEE_PCT;
+}
+
+/**
+ * True om personen omfattas av ungdomsnedsättningen 19–23 år vid arbetstillfället.
+ * Kräver att åldern vid årets ingång är 18–22 år OCH att datumet ligger inom
+ * perioden 2026-04-01 – 2027-09-30.
+ */
+export function isYouthReductionEligible(birth: Date, workDate: Date): boolean {
+  const t = workDate.getTime();
+  if (t < YOUTH_PERIOD_START.getTime() || t > YOUTH_PERIOD_END.getTime()) return false;
+  const age = ageAtStartOfYear(birth, workDate);
+  return age >= 18 && age <= 22;
+}
+
+/**
+ * Beräknar arbetsgivarkostnad för en enskild lönepost och tar hänsyn till
+ * ungdomsnedsättningens månadstak (25 000 kr per utbetalningsmånad).
+ *
+ * @param birth              Födelsedatum, eller null om personnummer saknas.
+ * @param entryDate          Datum för posten (används både för ålder och period).
+ * @param entryGross         Bruttolön (kr) för just denna post.
+ * @param grossBeforeInMonth Ackumulerad bruttolön (kr) tidigare i samma månad
+ *                           för samma användare, exkl. denna post.
+ * @param fallbackPct        Sats att använda när personnummer saknas (manuell).
+ */
+export function employerFeeForEntry(args: {
+  birth: Date | null;
+  entryDate: Date;
+  entryGross: number;
+  grossBeforeInMonth: number;
+  fallbackPct: number;
+}): { cost: number; effectivePct: number } {
+  const { birth, entryDate, entryGross, grossBeforeInMonth, fallbackPct } = args;
+  const gross = Math.max(0, entryGross);
+  if (gross === 0) return { cost: 0, effectivePct: 0 };
+
+  if (birth && isYouthReductionEligible(birth, entryDate)) {
+    const remainingUnderCap = Math.max(0, YOUTH_SALARY_CAP - Math.max(0, grossBeforeInMonth));
+    const underCap = Math.min(gross, remainingUnderCap);
+    const overCap = gross - underCap;
+    const cost =
+      underCap * (YOUTH_REDUCED_PCT / 100) +
+      overCap * (FULL_EMPLOYER_FEE_PCT / 100);
+    const effectivePct = (cost / gross) * 100;
+    return { cost: gross + cost, effectivePct };
+  }
+
+  const pct = birth ? employerFeePctForAge(birth, entryDate) : fallbackPct;
+  return { cost: gross * (1 + pct / 100), effectivePct: pct };
 }
