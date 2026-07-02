@@ -24,6 +24,12 @@ export const Route = createFileRoute("/_authenticated/admin-summary")({
 
 function fmtHours(ms: number) { return (ms / 3600000).toFixed(2); }
 function fmtKr(n: number) { return n.toLocaleString("sv-SE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function firstNameOf(u: { first_name?: string | null; email?: string | null; user_id: string }) {
+  const fn = (u.first_name ?? "").trim();
+  if (fn) return fn;
+  if (u.email) return u.email.split("@")[0];
+  return u.user_id;
+}
 
 function AdminSummaryPage() {
   const checkAdmin = useServerFn(isAdmin);
@@ -49,6 +55,7 @@ function AdminSummaryPage() {
   const [showEmployer, setShowEmployer] = useState(true);
   const [showBilling, setShowBilling] = useState(true);
   const [pdfBusy, setPdfBusy] = useState(false);
+  const [pdfDetail, setPdfDetail] = useState<"entries" | "daily">("entries");
 
   const usersQ = useQuery({
     queryKey: ["managed-users"],
@@ -151,7 +158,7 @@ function AdminSummaryPage() {
 
       const doc = new jsPDF({ unit: "pt", format: "a4" });
       const s = summaryQ.data;
-      const usersMap = new Map(usersQ.data?.map((u) => [u.user_id, u.email ?? u.user_id]) ?? []);
+      const usersMap = new Map(usersQ.data?.map((u) => [u.user_id, firstNameOf(u)]) ?? []);
       const clientsMap = new Map(clientsQ.data?.map((c) => [c.id, c.name]) ?? []);
       const projectsMap = new Map(projectsQ.data?.map((p) => [p.id, p.name]) ?? []);
       const timeSuffix = (fromTime !== "00:00" || toTime !== "00:00") ? ` ${fromTime}–${toTime}` : "";
@@ -223,20 +230,40 @@ function AdminSummaryPage() {
 
       const fmtDate = (iso: string) => new Date(iso).toLocaleDateString("sv-SE");
       const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" });
-      addSection(
-        `Poster (${entries.length})`,
-        ["Datum", "Start", "Slut", "Användare", "Projekt", "Kund", "Beskrivning", "Timmar"],
-        entries.map((e) => [
-          fmtDate(e.start_time),
-          fmtTime(e.start_time),
-          fmtTime(e.end_time),
-          e.user_label,
-          e.project_name ?? "",
-          e.client_name ?? "",
-          e.description ?? "",
-          fmtHours(e.ms),
-        ]),
-      );
+      if (pdfDetail === "entries") {
+        addSection(
+          `Poster (${entries.length})`,
+          ["Datum", "Start", "Slut", "Användare", "Projekt", "Kund", "Beskrivning", "Timmar"],
+          entries.map((e) => [
+            fmtDate(e.start_time),
+            fmtTime(e.start_time),
+            fmtTime(e.end_time),
+            e.user_label,
+            e.project_name ?? "",
+            e.client_name ?? "",
+            e.description ?? "",
+            fmtHours(e.ms),
+          ]),
+        );
+      } else {
+        const agg = new Map<string, { date: string; user: string; ms: number; count: number }>();
+        for (const e of entries) {
+          const dateKey = fmtDate(e.start_time);
+          const key = `${dateKey}||${e.user_id}`;
+          const cur = agg.get(key);
+          if (cur) { cur.ms += e.ms; cur.count += 1; }
+          else agg.set(key, { date: dateKey, user: e.user_label, ms: e.ms, count: 1 });
+        }
+        const rows = Array.from(agg.values()).sort((a, b) => {
+          if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+          return a.user.localeCompare(b.user, "sv");
+        });
+        addSection(
+          `Summering per användare och dag (${rows.length})`,
+          ["Datum", "Användare", "Antal poster", "Timmar"],
+          rows.map((r) => [r.date, r.user, String(r.count), fmtHours(r.ms)]),
+        );
+      }
 
       const pageCount = doc.getNumberOfPages();
       for (let i = 1; i <= pageCount; i += 1) {
@@ -300,7 +327,7 @@ function AdminSummaryPage() {
                     <SelectContent>
                       <SelectItem value="all">Alla användare</SelectItem>
                       {usersQ.data?.map((u) => (
-                        <SelectItem key={u.user_id} value={u.user_id}>{u.email ?? u.user_id}</SelectItem>
+                        <SelectItem key={u.user_id} value={u.user_id}>{firstNameOf(u)}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -350,6 +377,17 @@ function AdminSummaryPage() {
                       <CostToggle label="Netto efter skatt" checked={showNet} onChange={setShowNet} />
                       <CostToggle label="Arbetsgivarkostnad" checked={showEmployer} onChange={setShowEmployer} />
                       <CostToggle label="Debitering kund" checked={showBilling} onChange={setShowBilling} />
+                      <div className="border-t pt-2">
+                        <div className="mb-1 text-xs font-medium text-muted-foreground">Specifikation i PDF</div>
+                        <label className="flex cursor-pointer items-center gap-2 text-sm">
+                          <input type="radio" name="pdfDetail" checked={pdfDetail === "entries"} onChange={() => setPdfDetail("entries")} />
+                          <span>Alla tidsposter</span>
+                        </label>
+                        <label className="flex cursor-pointer items-center gap-2 text-sm">
+                          <input type="radio" name="pdfDetail" checked={pdfDetail === "daily"} onChange={() => setPdfDetail("daily")} />
+                          <span>Per användare och dag</span>
+                        </label>
+                      </div>
                     </PopoverContent>
                   </Popover>
                   <Button onClick={exportCsv} variant="outline" size="sm" disabled={!summaryQ.data}>

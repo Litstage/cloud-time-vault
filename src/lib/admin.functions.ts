@@ -908,6 +908,7 @@ export const getSummary = createServerFn({ method: "GET" })
     // Collect user ids and resolve emails
     const userIds = new Set<string>(filtered.map((r: any) => r.user_id as string));
     const emails = new Map<string, string | null>();
+    const firstNames = new Map<string, string | null>();
     if (userIds.size > 0) {
       let page = 1;
       while (page < 20) {
@@ -916,7 +917,12 @@ export const getSummary = createServerFn({ method: "GET" })
           perPage: 1000,
         });
         if (uErr) throw new Error(uErr.message);
-        for (const u of usersPage.users) emails.set(u.id, u.email ?? null);
+        for (const u of usersPage.users) {
+          emails.set(u.id, u.email ?? null);
+          const md = (u.user_metadata ?? {}) as any;
+          const fn = ((md.first_name ?? "") as string).trim();
+          firstNames.set(u.id, fn || null);
+        }
         if (usersPage.users.length < 1000) break;
         page += 1;
       }
@@ -1133,7 +1139,9 @@ export const getSummary = createServerFn({ method: "GET" })
       const pu = perUser.get(uid);
       if (pu) { pu.ms += ms; pu.count += 1; addInto(pu, split, amount, billing, employerCost, net); }
       else {
-        const row: SummaryRow = { key: uid, label: emails.get(uid) ?? uid, ms, count: 1 };
+        const emailForUid = emails.get(uid) ?? null;
+        const uidLabel = firstNames.get(uid) || (emailForUid ? emailForUid.split("@")[0] : uid);
+        const row: SummaryRow = { key: uid, label: uidLabel, ms, count: 1 };
         addInto(row, split, amount, billing, employerCost, net);
         perUser.set(uid, row);
       }
@@ -1205,9 +1213,8 @@ export const getSummaryEntries = createServerFn({ method: "GET" })
         for (const u of usersPage.users) {
           const md = (u.user_metadata ?? {}) as any;
           const first = (md.first_name ?? "").trim();
-          const last = (md.last_name ?? "").trim();
-          const name = [first, last].filter(Boolean).join(" ");
-          userLabels.set(u.id, name || u.email || u.id);
+          const emailPrefix = u.email ? u.email.split("@")[0] : "";
+          userLabels.set(u.id, first || emailPrefix || u.id);
         }
         if (usersPage.users.length < 1000) break;
         page += 1;
