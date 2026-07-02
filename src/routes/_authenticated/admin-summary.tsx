@@ -249,8 +249,10 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function SummarySection({ title, rows, loading, totalMs, showSwatch, showAmount, showBilling }: {
-  title: string; rows: SummaryRow[]; loading: boolean; totalMs: number; showSwatch?: boolean; showAmount?: boolean; showBilling?: boolean;
+function SummarySection({ title, rows, loading, totalMs, showSwatch, showAmount, showBilling, showEmployerCost, showNet }: {
+  title: string; rows: SummaryRow[]; loading: boolean; totalMs: number;
+  showSwatch?: boolean; showAmount?: boolean; showBilling?: boolean;
+  showEmployerCost?: boolean; showNet?: boolean;
 }) {
   return (
     <section className="space-y-2">
@@ -278,6 +280,12 @@ function SummarySection({ title, rows, loading, totalMs, showSwatch, showAmount,
                     <div className="text-xs text-muted-foreground">{pct.toFixed(1)}% · {r.count} poster</div>
                     {showAmount && r.amount !== undefined && (
                       <div className="text-xs font-medium text-foreground">Lön: {fmtKr(r.amount)} kr</div>
+                    )}
+                    {showNet && r.net !== undefined && (
+                      <div className="text-xs text-muted-foreground">Netto: {fmtKr(r.net)} kr</div>
+                    )}
+                    {showEmployerCost && r.employerCost !== undefined && r.employerCost > 0 && (
+                      <div className="text-xs text-muted-foreground">Arb.giv.: {fmtKr(r.employerCost)} kr</div>
                     )}
                     {showBilling && r.billing !== undefined && r.billing > 0 && (
                       <div className="text-xs font-medium text-foreground">Debitering: {fmtKr(r.billing)} kr</div>
