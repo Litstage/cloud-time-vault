@@ -333,6 +333,7 @@ function AdminPage() {
   const [editTax, setEditTax] = useState("30");
   const [editTaxTableNumber, setEditTaxTableNumber] = useState("32");
   const [editTaxTableColumn, setEditTaxTableColumn] = useState("1");
+  const [editPersonalNumber, setEditPersonalNumber] = useState("");
 
   const updateMut = useMutation({
     mutationFn: (v: { userId: string; email?: string; phone?: string; firstName?: string; lastName?: string; password?: string }) =>
@@ -347,7 +348,7 @@ function AdminPage() {
   });
 
   const wageMut = useMutation({
-    mutationFn: (v: { user_id: string; hourly_rate: number; ob1_pct: number; ob2_pct: number; ob3_pct: number; employer_fee_pct: number; tax_pct: number; tax_table_number: number; tax_table_column: number }) =>
+    mutationFn: (v: { user_id: string; hourly_rate: number; ob1_pct: number; ob2_pct: number; ob3_pct: number; employer_fee_pct: number; tax_pct: number; tax_table_number: number; tax_table_column: number; personal_number: string | null }) =>
       saveWage({ data: v }),
     onSuccess: () => toast.success("Löneuppgifter sparade"),
     onError: (e: Error) => toast.error(e.message),
