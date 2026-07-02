@@ -346,13 +346,13 @@ function AdminProjectsPage() {
                     onChange={(e) => setNewClientRate(e.target.value)}
                   />
                   <Input
-                    placeholder="OB1 22–07 (kr/h)"
+                    placeholder="OB1-tillägg 22–07 (kr/h)"
                     inputMode="decimal"
                     value={newClientOb1}
                     onChange={(e) => setNewClientOb1(e.target.value)}
                   />
                   <Input
-                    placeholder="OB2 helg (kr/h)"
+                    placeholder="OB2-tillägg helg (kr/h)"
                     inputMode="decimal"
                     value={newClientOb2}
                     onChange={(e) => setNewClientOb2(e.target.value)}
@@ -379,8 +379,8 @@ function AdminProjectsPage() {
                           <Input className="h-8 flex-1 min-w-[140px]" value={editClientName} onChange={(e) => setEditClientName(e.target.value)} />
                           <Input className="h-8 flex-1 min-w-[140px]" value={editClientNote} onChange={(e) => setEditClientNote(e.target.value)} placeholder="Anteckning" />
                           <Input className="h-8 w-32" value={editClientRate} onChange={(e) => setEditClientRate(e.target.value)} placeholder="kr/h" inputMode="decimal" />
-                          <Input className="h-8 w-32" value={editClientOb1} onChange={(e) => setEditClientOb1(e.target.value)} placeholder="OB1 kr/h" inputMode="decimal" />
-                          <Input className="h-8 w-32" value={editClientOb2} onChange={(e) => setEditClientOb2(e.target.value)} placeholder="OB2 kr/h" inputMode="decimal" />
+                          <Input className="h-8 w-36" value={editClientOb1} onChange={(e) => setEditClientOb1(e.target.value)} placeholder="OB1-tillägg" inputMode="decimal" />
+                          <Input className="h-8 w-36" value={editClientOb2} onChange={(e) => setEditClientOb2(e.target.value)} placeholder="OB2-tillägg" inputMode="decimal" />
                           <Button size="sm" onClick={() => updateClient.mutate({ id: c.id, name: editClientName, note: editClientNote, rate: editClientRate, ob1: editClientOb1, ob2: editClientOb2 })} disabled={updateClient.isPending}>
                             <Save className="mr-1 h-4 w-4" /> Spara
                           </Button>
@@ -394,8 +394,8 @@ function AdminProjectsPage() {
                             <div className="text-sm font-medium">{c.name}</div>
                             <div className="text-xs text-muted-foreground">
                               {c.hourly_rate > 0 ? `${c.hourly_rate.toLocaleString("sv-SE")} kr/h` : "Ingen timdebitering"}
-                              {c.ob1_rate > 0 ? ` · OB1 ${c.ob1_rate.toLocaleString("sv-SE")}` : ""}
-                              {c.ob2_rate > 0 ? ` · OB2 ${c.ob2_rate.toLocaleString("sv-SE")}` : ""}
+                              {c.ob1_rate > 0 ? ` · OB1 +${c.ob1_rate.toLocaleString("sv-SE")}` : ""}
+                              {c.ob2_rate > 0 ? ` · OB2 +${c.ob2_rate.toLocaleString("sv-SE")}` : ""}
                               {c.note ? ` · ${c.note}` : ""}
                             </div>
                           </div>
