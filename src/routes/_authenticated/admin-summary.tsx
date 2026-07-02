@@ -460,12 +460,19 @@ function AdminSummaryPage() {
                     <Stat label="OB3" value={`${fmtHours(s.totalOb3Ms)} h`} />
                   </div>
                   {(showGross || showNet || showEmployer || showBilling) && (
-                    <div className="grid grid-cols-2 gap-2 rounded-md bg-muted/40 p-3 text-xs sm:grid-cols-4">
-                      {showGross && <Stat label="Bruttolön" value={`${fmtKr(s.totalAmount)} kr`} />}
-                      {showNet && <Stat label="Netto (efter skatt)" value={`${fmtKr(s.totalNet)} kr`} />}
-                      {showEmployer && <Stat label="Arbetsgivarkostnad" value={`${fmtKr(s.totalEmployerCost)} kr`} />}
-                      {showBilling && <Stat label="Debitering kund" value={`${fmtKr(s.totalBilling)} kr`} />}
-                    </div>
+                    <>
+                      <div className="grid grid-cols-2 gap-2 rounded-md bg-muted/40 p-3 text-xs sm:grid-cols-4">
+                        {showGross && <Stat label="Bruttolön" value={`${fmtKr(s.totalAmount)} kr`} />}
+                        {showNet && <Stat label="Netto (efter skatt)" value={`${fmtKr(s.totalNet)} kr`} />}
+                        {showEmployer && <Stat label="Arbetsgivarkostnad" value={`${fmtKr(s.totalEmployerCost)} kr`} />}
+                        {showBilling && <Stat label="Debitering kund" value={`${fmtKr(s.totalBilling)} kr`} />}
+                      </div>
+                      {showGross && (
+                        <p className="text-xs text-muted-foreground">
+                          Bruttolön inkluderar procentbaserad OB: OB 50 betyder +50% på timlönen, inte 50 kr/timme.
+                        </p>
+                      )}
+                    </>
                   )}
                 </>
               )}
@@ -553,7 +560,7 @@ function SummarySection({ title, rows, loading, totalMs, showSwatch, showAmount,
                     <div className="font-mono text-sm font-semibold tabular-nums">{fmtHours(r.ms)} h</div>
                     <div className="text-xs text-muted-foreground">{pct.toFixed(1)}% · {r.count} poster</div>
                     {showAmount && r.amount !== undefined && (
-                      <div className="text-xs font-medium text-foreground">Lön: {fmtKr(r.amount)} kr</div>
+                      <div className="text-xs font-medium text-foreground">Bruttolön: {fmtKr(r.amount)} kr</div>
                     )}
                     {showNet && r.net !== undefined && (
                       <div className="text-xs text-muted-foreground">Netto: {fmtKr(r.net)} kr</div>
