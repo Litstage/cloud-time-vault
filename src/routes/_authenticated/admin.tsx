@@ -972,6 +972,16 @@ function AdminPage() {
                   onChange={(e) => setEditEmail(e.target.value)}
                 />
               </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Förnamn</Label>
+                  <Input value={editFirstName} onChange={(e) => setEditFirstName(e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Efternamn</Label>
+                  <Input value={editLastName} onChange={(e) => setEditLastName(e.target.value)} />
+                </div>
+              </div>
               <div className="space-y-1">
                 <Label className="text-xs">Telefonnummer</Label>
                 <Input
