@@ -20,6 +20,8 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Play, Square, Plus, Download, LogOut, FolderKanban, Trash2, MoreVertical, BarChart3, ShieldCheck, CalendarIcon, ChevronLeft, ChevronRight, Clock, UserCog, KeyRound, Pencil } from "lucide-react";
+import { Users } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { ApprovalGate } from "@/components/approval-gate";
 import {
@@ -111,11 +113,14 @@ function HomePage() {
 
   const [selfUserId, setSelfUserId] = useState<string | null>(null);
   const [targetUserId, setTargetUserId] = useState<string | null>(null);
+  const [visibleUserIds, setVisibleUserIds] = useState<string[]>([]);
+  const [userFilterSearch, setUserFilterSearch] = useState("");
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       if (data.user) {
         setSelfUserId(data.user.id);
         setTargetUserId((prev) => prev ?? data.user!.id);
+        setVisibleUserIds((prev) => (prev.length === 0 ? [data.user!.id] : prev));
       }
     });
   }, []);
@@ -129,6 +134,10 @@ function HomePage() {
   });
   const actingOnOther = userIsAdmin && targetUserId !== null && targetUserId !== selfUserId;
   const targetUser = usersQ.data?.find((u) => u.user_id === targetUserId) ?? null;
+  const approvedUsers = useMemo(
+    () => (usersQ.data ?? []).filter((u) => u.status === "approved"),
+    [usersQ.data],
+  );
   const nameOf = (u: { first_name?: string | null; last_name?: string | null; email?: string | null; user_id?: string }) => {
     const full = [u.first_name, u.last_name].filter(Boolean).join(" ").trim();
     return full || u.email || u.user_id?.slice(0, 8) || "";
@@ -161,6 +170,7 @@ function HomePage() {
       userIsAdmin ? "admin" : "user",
       selfUserId ?? "anon",
       actingOnOther ? `other:${targetUserId}` : "self",
+      userIsAdmin && !actingOnOther ? [...visibleUserIds].sort().join(",") : "n/a",
     ],
     queryFn: async (): Promise<Entry[]> => {
       if (actingOnOther && targetUserId) {
@@ -169,7 +179,10 @@ function HomePage() {
       }
       if (userIsAdmin) {
         const rows = await listAllFn({ data: undefined });
-        return rows.map((r) => ({
+        const allow = new Set(visibleUserIds);
+        return rows
+          .filter((r) => allow.has(r.user_id))
+          .map((r) => ({
           id: r.id,
           description: r.description,
           start_time: r.start_time,
@@ -192,6 +205,16 @@ function HomePage() {
     },
     enabled: !userIsAdmin || targetUserId !== null || adminQ.isFetched,
   });
+
+  const userFilterSummary = useMemo(() => {
+    if (!userIsAdmin) return "";
+    const total = approvedUsers.length + (selfUserId && !approvedUsers.some((u) => u.user_id === selfUserId) ? 1 : 0);
+    const count = visibleUserIds.length;
+    if (count === 0) return "Inga användare";
+    if (count === 1 && visibleUserIds[0] === selfUserId) return "Mina poster";
+    if (total > 0 && count >= total) return "Alla användare";
+    return `${count} användare`;
+  }, [userIsAdmin, approvedUsers, visibleUserIds, selfUserId]);
 
   const running = entriesQ.data?.find(
     (e) => !e.end_time && (!e.user_id || e.user_id === selfUserId || e.user_id === targetUserId),
@@ -468,6 +491,86 @@ function HomePage() {
               </Select>
             </div>
             <div className="flex items-center gap-1">
+              {userIsAdmin && !actingOnOther && (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="font-normal">
+                      <Users className="mr-2 h-4 w-4" />
+                      {userFilterSummary}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-72 p-0" align="end">
+                    <div className="border-b p-2">
+                      <Input
+                        placeholder="Sök användare…"
+                        value={userFilterSearch}
+                        onChange={(e) => setUserFilterSearch(e.target.value)}
+                        className="h-8"
+                      />
+                    </div>
+                    <div className="flex items-center gap-1 border-b p-1 text-xs">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 flex-1 text-xs"
+                        onClick={() => setVisibleUserIds(approvedUsers.map((u) => u.user_id))}
+                      >
+                        Markera alla
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 flex-1 text-xs"
+                        onClick={() => selfUserId && setVisibleUserIds([selfUserId])}
+                      >
+                        Bara jag
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 flex-1 text-xs"
+                        onClick={() => setVisibleUserIds([])}
+                      >
+                        Rensa
+                      </Button>
+                    </div>
+                    <div className="max-h-64 overflow-y-auto p-1">
+                      {approvedUsers
+                        .filter((u) => {
+                          const q = userFilterSearch.trim().toLowerCase();
+                          if (!q) return true;
+                          return nameOf(u).toLowerCase().includes(q) || (u.email ?? "").toLowerCase().includes(q);
+                        })
+                        .map((u) => {
+                          const checked = visibleUserIds.includes(u.user_id);
+                          const isSelf = u.user_id === selfUserId;
+                          return (
+                            <label
+                              key={u.user_id}
+                              className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
+                            >
+                              <Checkbox
+                                checked={checked}
+                                onCheckedChange={(v) => {
+                                  setVisibleUserIds((prev) =>
+                                    v ? [...prev.filter((id) => id !== u.user_id), u.user_id] : prev.filter((id) => id !== u.user_id),
+                                  );
+                                }}
+                              />
+                              <span className="truncate">
+                                {nameOf(u)}
+                                {isSelf && <span className="ml-1 text-xs text-muted-foreground">(du)</span>}
+                              </span>
+                            </label>
+                          );
+                        })}
+                      {approvedUsers.length === 0 && (
+                        <div className="px-2 py-3 text-center text-xs text-muted-foreground">Inga användare</div>
+                      )}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              )}
               <Button
                 variant="ghost"
                 size="icon"
