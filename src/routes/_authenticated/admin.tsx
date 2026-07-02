@@ -1287,7 +1287,7 @@ function EntryDialog(props: {
             <Label className="text-xs">Användare</Label>
             {isEdit ? (
               <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm">
-                {entry?.user_email ?? entry?.user_id}
+                {entry ? displayName(entry) : ""}
               </div>
             ) : (
               <Select value={userId} onValueChange={setUserId}>
@@ -1295,7 +1295,7 @@ function EntryDialog(props: {
                 <SelectContent>
                   {users.map((u) => (
                     <SelectItem key={u.user_id} value={u.user_id}>
-                      {u.email ?? u.user_id}
+                      {displayName(u)}
                     </SelectItem>
                   ))}
                 </SelectContent>
