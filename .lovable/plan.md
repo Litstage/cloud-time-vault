@@ -1,38 +1,27 @@
-## Anpassningsbara kostnadskolumner + PDF-export i Sammanställning
+Ändra sammanställningen så att förnamn används istället för e-post, och gör innehållet i PDF-specifikationen valbart mellan alla tidsposter eller summering per användare och dag.
 
-### 1. Kolumnväljare i UI (`src/routes/_authenticated/admin-summary.tsx`)
-- Ny popover-knapp "Visa kostnader" i filter-kortet med fyra checkboxar:
-  - Bruttolön
-  - Netto efter skatt
-  - Arbetsgivarkostnad
-  - Debitering kund
-- State `visibleCosts` (default: alla fyra på). Återställs vid sidladdning (ingen persistens).
-- Skickas som props ner till `SummarySection` och styr både:
-  - Totaler-boxen ("Bruttolön / Netto / Arb.giv. / Debitering") – dolda kort tas bort så griden krymper.
-  - Per-rad-visningen (`showAmount / showNet / showEmployerCost / showBilling` blir dynamiska).
+## Ändringar
 
-### 2. PDF-export – "Detaljerad med posterna"
-- Ny knapp "PDF" bredvid CSV-knappen.
-- Använder `jspdf` + `jspdf-autotable` (lätt, funkar i browsern; installeras via `bun add jspdf jspdf-autotable`).
-- Innehåll i PDF:en, i ordning:
-  1. Rubrik "Sammanställning" + valt datum/tid-intervall + valda filter (användare/kund/projekt).
-  2. Totaler (endast valda kostnadsfält) + timmar (Normal/OB1/OB2/OB3/Total).
-  3. Tabell "Per kund" – kolumner: Kund, Timmar, (valda kostnader).
-  4. Tabell "Per projekt" – Projekt, Kund, Timmar, (valda kostnader).
-  5. Tabell "Per användare" – Namn, Timmar, (valda kostnader).
-  6. Tabell "Poster" – Datum, Start, Slut, Användare, Projekt, Beskrivning, Timmar. Hämtas via ny/utökad server-funktion.
+**`src/lib/admin.functions.ts`**
+- I `getSummary`: bygg en `firstNames`-map (fallback: e-post-prefix, sen userId) och använd den som `label` för `perUser`-raderna istället för e-post.
+- I `getSummaryEntries`: sätt `user_label` till enbart förnamn (fallback: e-post-prefix före `@`, sen userId). Inga efternamn, inga e-postadresser.
 
-### 3. Server-funktion: hämta detaljerade poster till PDF
-- I `src/lib/admin.functions.ts`: utöka `getSummary` att även returnera `entries: DetailedEntry[]` (redan finns intern lista – exponeras med namn/projekt/kund upplösta) **eller** ny `getDetailedEntries` med samma filter (from/to/fromTime/toTime/userId/clientId/projectId).
-- Väljer alternativ B (ny funktion) för att inte tynga sammanställningen när PDF inte används; anropas bara vid PDF-klick via `useServerFn` + on-demand `queryClient.fetchQuery`.
+**`src/routes/_authenticated/admin-summary.tsx`**
+- Användarfiltret (Select): visa förnamn istället för e-post. Lägg till en hjälpare som hämtar förnamn från `usersQ.data` (fallback e-post-prefix).
+- Lägg till ny state `pdfDetail: "entries" | "daily"` (default `"entries"`, sparas inte mellan sessioner).
+- Popover-menyn "Visa kostnader" byggs ut med en radiogrupp "Specifikation i PDF":
+  - "Alla tidsposter" (nuvarande beteende)
+  - "Summering per användare och dag"
+- I `exportPdf`:
+  - Byt "Användare"-raden i filterhuvudet till förnamn.
+  - Om `pdfDetail === "entries"`: behåll nuvarande tabell "Poster" men ersätt `Användare`-kolumnen med enbart förnamn (redan gjort via `user_label`).
+  - Om `pdfDetail === "daily"`: aggregera `entries` per (`user_id`, datum i sv-SE) → kolumner: Datum, Användare (förnamn), Antal poster, Timmar. Sortera på datum, sedan förnamn.
 
-### Tekniska detaljer
-- Filnamn: `sammanstallning-<from>_<to>.pdf`.
-- Svenska rubriker och `toLocaleString("sv-SE")`-formattering, samma `fmtHours` / `fmtKr` som idag.
-- Autotable med `theme: "striped"`, sidbrytning automatiskt, sidfot med sidnummer.
-- CSV-exporten lämnas oförändrad.
+**PDF-filnamn**: oförändrat.
 
-### Utanför scope
-- Sparade kolumnval mellan besök (användaren valde nej).
-- Ändring av vilka timkolumner (Normal/OB) som visas – endast kostnader är valbara.
-- Ändringar i övriga sidor (index, admin) – endast `admin-summary.tsx` + ny/utökad server-funktion.
+## Tekniska detaljer
+
+- Förnamnshjälpare i admin-summary.tsx: `(u) => (u.first_name?.trim() || u.email?.split("@")[0] || u.user_id)`.
+- I `getSummaryEntries`: bygg `firstLabels` från `auth.admin.listUsers` på samma sätt som idag, men mappa till förnamn/e-post-prefix istället för "förnamn efternamn / email".
+- Aggregeringen för "per användare och dag" görs klientsidan i `exportPdf` på det redan hämtade `entries`-arrayet (ingen ny server-fn behövs).
+- Ingen persistens av valet mellan sessioner (state i komponenten).
