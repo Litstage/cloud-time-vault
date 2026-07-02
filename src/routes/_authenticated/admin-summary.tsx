@@ -222,7 +222,7 @@ function AdminSummaryPage() {
       const totalsRows: [string, string][] = [
         ["Total tid", `${fmtH(s.totalMs)} h (${s.totalCount} poster)`],
       ];
-      if (showOb) totalsRows.push(["Normal / OB1 / OB2 / OB3", `${fmtH(s.totalNormalMs)} / ${fmtH(s.totalOb1Ms)} / ${fmtH(s.totalOb2Ms)} / ${fmtH(s.totalOb3Ms)} h`]);
+      if (showOb) totalsRows.push(["OB-tillägg (kr)", `${fmtKr(s.totalObAmount)} kr`]);
       if (showGross) totalsRows.push(["Bruttolön", `${fmtKr(s.totalAmount)} kr`]);
       if (showNet) totalsRows.push(["Netto efter skatt", `${fmtKr(s.totalNet)} kr`]);
       if (showEmployer) totalsRows.push(["Arbetsgivarkostnad", `${fmtKr(s.totalEmployerCost)} kr`]);
