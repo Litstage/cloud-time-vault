@@ -780,6 +780,118 @@ function AdminPage() {
         saving={createEntryMut.isPending || updateEntryMut.isPending}
       />
 
+      <Dialog open={copyOpen} onOpenChange={setCopyOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Kopiera / flytta tider</DialogTitle>
+          </DialogHeader>
+          {(() => {
+            const selectedRows = rows.filter((r) => selectedIds.has(r.id));
+            const sourceUserIds = new Set(selectedRows.map((r) => r.user_id));
+            const eligible = (usersQ.data ?? []).filter(
+              (u) => u.status === "approved" || u.is_admin,
+            );
+            const forceCopy = copyTargets.size > 1;
+            const effectiveMode: "copy" | "move" = forceCopy ? "copy" : copyMode;
+            return (
+              <div className="space-y-4">
+                <div className="text-sm text-muted-foreground">
+                  {selectedRows.length} markerade poster från {sourceUserIds.size} användare.
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs">Läge</Label>
+                  <div className="flex gap-4 text-sm">
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="copy-mode"
+                        checked={effectiveMode === "copy"}
+                        onChange={() => setCopyMode("copy")}
+                      />
+                      Kopiera (behåll original)
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="copy-mode"
+                        checked={effectiveMode === "move"}
+                        disabled={forceCopy}
+                        onChange={() => setCopyMode("move")}
+                      />
+                      Flytta (byt ägare)
+                    </label>
+                  </div>
+                  {forceCopy && (
+                    <div className="text-xs text-muted-foreground">
+                      Flytta stöds endast med en mottagare.
+                    </div>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs">Mottagare</Label>
+                  <div className="max-h-56 space-y-1 overflow-y-auto rounded-md border p-2">
+                    {eligible.length === 0 ? (
+                      <div className="p-2 text-sm text-muted-foreground">Inga användare.</div>
+                    ) : (
+                      eligible.map((u) => {
+                        const isSource = sourceUserIds.has(u.user_id) && sourceUserIds.size === 1;
+                        return (
+                          <label key={u.user_id} className="flex items-center gap-2 text-sm">
+                            <input
+                              type="checkbox"
+                              checked={copyTargets.has(u.user_id)}
+                              disabled={isSource}
+                              onChange={(e) => {
+                                setCopyTargets((prev) => {
+                                  const next = new Set(prev);
+                                  if (e.target.checked) next.add(u.user_id);
+                                  else next.delete(u.user_id);
+                                  return next;
+                                });
+                              }}
+                            />
+                            <span className={isSource ? "text-muted-foreground" : ""}>
+                              {u.email ?? u.user_id}
+                              {isSource ? " (källa)" : ""}
+                            </span>
+                          </label>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+                <div className="text-sm">
+                  {effectiveMode === "copy"
+                    ? `Skapar ${selectedRows.length * copyTargets.size} nya poster.`
+                    : `Flyttar ${selectedRows.length} poster till vald användare.`}
+                </div>
+                <DialogFooter>
+                  <Button variant="ghost" onClick={() => setCopyOpen(false)}>
+                    Avbryt
+                  </Button>
+                  <Button
+                    disabled={
+                      copyMut.isPending ||
+                      copyTargets.size === 0 ||
+                      selectedRows.length === 0
+                    }
+                    onClick={() =>
+                      copyMut.mutate({
+                        entryIds: selectedRows.map((r) => r.id),
+                        targetUserIds: Array.from(copyTargets),
+                        mode: effectiveMode,
+                      })
+                    }
+                  >
+                    {effectiveMode === "copy" ? "Kopiera" : "Flytta"}
+                  </Button>
+                </DialogFooter>
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
         <DialogContent>
           <DialogHeader>
