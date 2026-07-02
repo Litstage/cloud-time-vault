@@ -53,6 +53,20 @@ function formatHours(ms: number) {
   return (ms / 3600000).toFixed(2);
 }
 
+function displayName(u: {
+  first_name?: string | null;
+  last_name?: string | null;
+  email?: string | null;
+  user_id?: string;
+}): string {
+  const full = [u.first_name, u.last_name].filter(Boolean).join(" ").trim();
+  return full || u.email || u.user_id || "";
+}
+
+function hasName(u: { first_name?: string | null; last_name?: string | null }): boolean {
+  return Boolean((u.first_name && u.first_name.trim()) || (u.last_name && u.last_name.trim()));
+}
+
 function StatusBadge({ status }: { status: ManagedUser["status"] }) {
   const styles: Record<ManagedUser["status"], string> = {
     pending: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
