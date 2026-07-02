@@ -791,6 +791,18 @@ export type SummaryResult = {
   perUser: SummaryRow[];
 };
 
+export type DetailedEntry = {
+  id: string;
+  user_id: string;
+  user_label: string;
+  start_time: string;
+  end_time: string;
+  ms: number;
+  project_name: string | null;
+  client_name: string | null;
+  description: string | null;
+};
+
 export type UserWage = {
   user_id: string;
   hourly_rate: number;
