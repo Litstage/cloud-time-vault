@@ -318,6 +318,9 @@ function HomePage() {
               <DropdownMenuItem onClick={exportCsv}>
                 <Download className="mr-2 h-4 w-4" /> Exportera CSV
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setPasswordOpen(true)}>
+                <KeyRound className="mr-2 h-4 w-4" /> Byt lösenord
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={signOut}>
                 <LogOut className="mr-2 h-4 w-4" /> Logga ut
