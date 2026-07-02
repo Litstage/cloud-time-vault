@@ -118,7 +118,10 @@ function AdminSummaryPage() {
 
   function exportCsv() {
     if (!summaryQ.data) return;
-    const esc = (v: string) => `"${v.replace(/"/g, '""')}"`;
+    const esc = (v: string) => {
+      const safe = /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
+      return `"${safe.replace(/"/g, '""')}"`;
+    };
     const lines: string[] = [];
     lines.push("Sektion,Etikett,Underetikett,Normal h,OB1 h,OB2 h,OB3 h,Totalt h,Lön kr,Debitering kr,Antal poster");
     // Note: kept CSV shape stable; new totals visible in UI.
