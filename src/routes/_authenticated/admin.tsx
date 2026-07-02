@@ -68,11 +68,15 @@ function displayName(u: NameLike): string {
   const full = [fn, ln].filter(Boolean).join(" ").trim();
   return full || u.email || u.user_email || u.user_id || "";
 }
+function firstName(u: NameLike): string {
+  return u.first_name ?? u.user_first_name ?? "";
+}
 function hasName(u: NameLike): boolean {
   const fn = u.first_name ?? u.user_first_name ?? null;
   const ln = u.last_name ?? u.user_last_name ?? null;
   return Boolean((fn && fn.trim()) || (ln && ln.trim()));
 }
+
 
 function StatusBadge({ status }: { status: ManagedUser["status"] }) {
   const styles: Record<ManagedUser["status"], string> = {
@@ -774,17 +778,16 @@ function AdminPage() {
                             />
                           </td>
                           <td className="px-3 py-2 max-w-[12rem]">
-                            <div className="truncate font-medium">{displayName(r)}</div>
-                            {!hasName(r) ? (
+                            <div className="truncate font-medium">
+                              {firstName(r) || r.user_email || ""}
+                            </div>
+                            {!firstName(r) && (
                               <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300">
                                 Namn saknas
                               </span>
-                            ) : (
-                              r.user_email && (
-                                <div className="truncate text-xs text-muted-foreground">{r.user_email}</div>
-                              )
                             )}
                           </td>
+
                           <td className="px-3 py-2 whitespace-nowrap">
                             {new Date(r.start_time).toLocaleDateString("sv-SE")}
                           </td>

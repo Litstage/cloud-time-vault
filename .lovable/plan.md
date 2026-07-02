@@ -1,23 +1,55 @@
-## Mål
-Låt admin på förstasidan välja **vilka användares poster** som ska visas i listan (utöver de egna).
+# Plan: Förenkla användarkolumnen i adminlistan
+
+## Vad vi ska bygga
+I tabellen "Alla tider" på admin-sidan ska användarkolumnen visa **bara förnamnet** i stället för nuvarande kombination av fullständigt namn + mejl.
 
 ## Ändringar
 
-### `src/routes/_authenticated/index.tsx`
-- Nytt state (endast admin): `visibleUserIds: string[]`, default `[selfUserId]` när `selfUserId` finns.
-- UI: En `Popover` bredvid datumväljaren i "Poster"-raden, visas endast när `userIsAdmin && !actingOnOther`.
-  - Trigger-knapp med sammanfattning:
-    - Bara jag själv → "Mina poster"
-    - N valda (fler än 1) → "N användare"
-    - Alla godkända valda → "Alla användare"
-  - Innehåll: sökfält + checkbox-lista över godkända användare (hämtas från befintlig `usersQ`), samt knappar "Markera alla" / "Rensa" / "Bara jag".
-- I `entriesQ`:
-  - `actingOnOther` (registrerar för annan): oförändrat.
-  - Vanlig användare: oförändrat (bara egna).
-  - Admin: fortsätt använda `getAllTimeEntries` och filtrera klient-sida på `visibleUserIds` (endast rader vars `user_id` finns i listan).
-  - Lägg `visibleUserIds` (sorterad + join) och `selfUserId` i `queryKey` så cachen inte blandas.
-- Namn-badge per rad: oförändrat — visas när raden tillhör någon annan än inloggad användare.
+### 1. Ny hjälpfunktion för förnamn
+I `src/routes/_authenticated/admin.tsx` lägger vi till en liten funktion bredvid befintliga `displayName` / `hasName`:
 
-### Övrigt
-- Registrering, start/stopp, "Registrera för"-väljaren: orörda.
-- Ingen ändring i admin-/översiktssidor, RLS eller CSV-export.
+```text
+function firstName(u: NameLike): string {
+  return u.first_name ?? u.user_first_name ?? "";
+}
+```
+
+Befintliga `displayName` och `hasName` behålls oförändrade eftersom de används på andra ställen (t.ex. användarlistan och dialoger).
+
+### 2. Uppdatera användarcellen i tidtabellen
+Rad 776–786 ändras så att:
+
+- Endast förnamnet visas (`firstName(r)`).
+- Efternamn och mejlrad tas bort helt.
+- "Namn saknas"-märket behålls när inget förnamn finns, så det fortfarande går att se att användaren saknar registrerat namn.
+
+Resultatet blir ungefär:
+
+```text
+<td className="px-3 py-2 max-w-[12rem]">
+  <div className="truncate font-medium">{firstName(r) || (r.user_email ?? "")}</div>
+  {!firstName(r) && (
+    <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300">
+      Namn saknas
+    </span>
+  )}
+</td>
+```
+
+Fallback till mejl används bara om förnamn helt saknas, så raden inte blir tom.
+
+### 3. Kolumnrubrik
+Rubriken "Användare" behålls som den är.
+
+## Tekniska detaljer
+- Fil som ändras: `src/routes/_authenticated/admin.tsx`.
+- Inga nya beroenden.
+- Inga ändringar i backend, databas eller andra sidor.
+- Typecheck (`bunx tsc --noEmit`) körs efter ändringen.
+
+## Verifiering
+Efter implementationen kontrolleras att:
+1. Tabellen fortfarande renderas utan fel.
+2. Användarkolumnen visar endast förnamn.
+3. "Namn saknas" visas fortfarande för användare utan namn.
+4. Övriga kolumner (Datum, Start, Slut, Projekt, Beskrivning, Timmar, Åtgärder) påverkas inte.
