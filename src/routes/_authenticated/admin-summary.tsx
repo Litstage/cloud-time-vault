@@ -143,7 +143,7 @@ function AdminSummaryPage() {
         ) : (
           <>
             <Card className="space-y-3 p-4">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div className="space-y-1">
                   <Label className="text-xs">Från</Label>
                   <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
@@ -151,6 +151,14 @@ function AdminSummaryPage() {
                 <div className="space-y-1">
                   <Label className="text-xs">Till</Label>
                   <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Från kl</Label>
+                  <Input type="time" value={fromTime} onChange={(e) => setFromTime(e.target.value || "00:00")} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Till kl</Label>
+                  <Input type="time" value={toTime} onChange={(e) => setToTime(e.target.value || "00:00")} />
                 </div>
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
