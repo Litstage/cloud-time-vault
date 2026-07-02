@@ -1213,9 +1213,8 @@ export const getSummaryEntries = createServerFn({ method: "GET" })
         for (const u of usersPage.users) {
           const md = (u.user_metadata ?? {}) as any;
           const first = (md.first_name ?? "").trim();
-          const last = (md.last_name ?? "").trim();
-          const name = [first, last].filter(Boolean).join(" ");
-          userLabels.set(u.id, name || u.email || u.id);
+          const emailPrefix = u.email ? u.email.split("@")[0] : "";
+          userLabels.set(u.id, first || emailPrefix || u.id);
         }
         if (usersPage.users.length < 1000) break;
         page += 1;
