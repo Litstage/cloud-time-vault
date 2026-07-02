@@ -123,15 +123,21 @@ function UsersSection(props: {
             >
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <span className="truncate text-sm font-medium">{u.email ?? u.user_id}</span>
+                  <span className="truncate text-sm font-medium">{displayName(u)}</span>
                   {u.is_admin && (
                     <span className="rounded-full bg-primary/15 px-2 py-0.5 text-xs font-medium text-primary">
                       Admin
                     </span>
                   )}
                   <StatusBadge status={u.status} />
+                  {!hasName(u) && (
+                    <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-300">
+                      Namn saknas
+                    </span>
+                  )}
                 </div>
                 <div className="text-xs text-muted-foreground">
+                  {hasName(u) && u.email ? <>{u.email} · </> : null}
                   {u.phone ? <>Tel: {u.phone} · </> : null}
                   Skapad {new Date(u.created_at).toLocaleDateString("sv-SE")}
                 </div>
