@@ -916,7 +916,7 @@ function AdminPage() {
                               }}
                             />
                             <span className={isSource ? "text-muted-foreground" : ""}>
-                              {u.email ?? u.user_id}
+                              {displayName(u)}
                               {isSource ? " (källa)" : ""}
                             </span>
                           </label>
