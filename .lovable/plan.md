@@ -1,24 +1,32 @@
-## Mål
+## Problem
 
-1. Låt vanliga användare **redigera** sina egna tidsposter (inte bara skapa/ta bort).
-2. Låt användare **byta sitt eget lösenord** från appen.
+När en admin lägger in tiden `00:30–02:30` via huvudsidan (eller admin-vyn) ändras den till `02:30–04:30` efter sparning.
 
-## Ändringar
+Orsaken: `adminCreateTimeEntry` / `adminUpdateTimeEntry` i `src/lib/admin.functions.ts` tar emot datum + `HH:MM` som separata strängar och bygger tiden på servern med:
 
-**`src/routes/_authenticated/index.tsx`**
-- Gör varje rad i postlistan klickbar → öppnar samma `ManualEntryDialog` i redigeringsläge, förifyllt med postens datum/start/slut/projekt/beskrivning.
-- Utöka `ManualEntryDialog` med prop `editEntry?: Entry | null`:
-  - Titel: "Redigera tid" när `editEntry` finns, annars "Lägg till tid".
-  - `save()` gör `update` mot `time_entries` när `editEntry` finns (via `supabase` när det är egen post, via `adminUpdateTimeEntry` när admin agerar åt annan).
-  - RLS tillåter redan användare att uppdatera egna poster.
-- Lägg till menyalternativ **"Byt lösenord"** i dropdown-menyn som öppnar en enkel dialog.
+```ts
+new Date(`${dateIso}T${startHHMM}:00`)
+```
 
-**Ny `ChangePasswordDialog` i `src/routes/_authenticated/index.tsx`**
-- Fält: nytt lösenord + bekräfta.
-- Validering: minst 6 tecken, matchande.
-- Anropar `supabase.auth.updateUser({ password })`.
-- Visar toast vid framgång/fel.
+Serverkoden kör i UTC. `"2026-07-02T00:30:00"` utan tidszon tolkas där som **UTC** → sparas som `00:30Z`. När webbläsaren sedan visar den med svensk tidszon (CEST, +2h) blir det `02:30`. Bugg = +2 timmar i sommartid.
+
+Vanliga användarens klient-path (`supabase.from(...).insert(...)`) har inte problemet i webbläsaren, men samma bugg finns i alla anrop som går via de här server-funktionerna, dvs. admin-registrering på huvudsidan och `admin.tsx` EntryDialog.
+
+## Fix
+
+Låt klienten alltid räkna om lokal tid till fullständig ISO-sträng (`toISOString()`) och skicka den till servern, så att servern aldrig behöver tolka `HH:MM` utan tidszon.
+
+### `src/lib/admin.functions.ts`
+- Byt input-signaturen på `adminCreateTimeEntry` och `adminUpdateTimeEntry` från `{ date, start, end }` till `{ startIso, endIso }` (fullständiga ISO-strängar med tidszonsinfo).
+- Ta bort/förenkla `computeIsoTimes` – validera bara att strängarna är giltiga `Date` och att `endIso > startIso` (nästa-dygn-logiken görs redan på klienten).
+- Använd `startIso`/`endIso` direkt i insert/update och i audit-loggen.
+
+### `src/routes/_authenticated/index.tsx` (ManualEntryDialog)
+- I admin-path (både create och update) bygg samma `startIso`/`endIso` som redan görs i klient-path (rad 651–655 / 687–692) och skicka dem till server-funktionen istället för `date/start/end`.
+
+### `src/routes/_authenticated/admin.tsx` (EntryDialog)
+- Samma sak: bygg `startIso`/`endIso` med `new Date(y, m-1, d, h, mi).toISOString()` på klienten och skicka in.
 
 ## Utanför scope
-- Inget krav på nuvarande lösenord (Supabase kräver bara aktiv session).
-- Ingen ändring av admin-vyn `admin.tsx` (redigering finns där redan).
+- Ingen ändring av databasen, RLS eller audit-tabellens schema (bara innehållet i `before_data`/`after_data` blir korrekt ISO).
+- Ingen förändring av visning eller övriga tidsberäkningar – de är redan korrekta så länge lagrad data har rätt tidszon.
