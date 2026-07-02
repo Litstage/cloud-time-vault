@@ -21,6 +21,8 @@ export type Database = {
           id: string
           name: string
           note: string | null
+          ob1_rate: number
+          ob2_rate: number
           updated_at: string
         }
         Insert: {
@@ -29,6 +31,8 @@ export type Database = {
           id?: string
           name: string
           note?: string | null
+          ob1_rate?: number
+          ob2_rate?: number
           updated_at?: string
         }
         Update: {
@@ -37,6 +41,8 @@ export type Database = {
           id?: string
           name?: string
           note?: string | null
+          ob1_rate?: number
+          ob2_rate?: number
           updated_at?: string
         }
         Relationships: []
