@@ -501,13 +501,20 @@ function HomePage() {
                     return (
                       <div key={e.id} className="flex items-center gap-3 px-4 py-3">
                         <div className="h-8 w-1 rounded-full" style={{ background: e.projects?.color ?? "var(--muted-foreground)" }} />
-                        <div className="min-w-0 flex-1">
+                        <button
+                          type="button"
+                          onClick={() => { setEditEntry(e); setManualOpen(true); }}
+                          className="min-w-0 flex-1 text-left"
+                        >
                           <div className="truncate text-sm font-medium">{e.description || "Ingen beskrivning"}</div>
                           <div className="text-xs text-muted-foreground">
                             {e.projects?.name ?? "Inget projekt"} · {new Date(e.start_time).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" })}–{new Date(e.end_time!).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" })}
                           </div>
-                        </div>
+                        </button>
                         <div className="font-mono text-sm tabular-nums">{formatDuration(dur)}</div>
+                        <Button variant="ghost" size="icon" onClick={() => { setEditEntry(e); setManualOpen(true); }}>
+                          <Pencil className="h-4 w-4 text-muted-foreground" />
+                        </Button>
                         <Button variant="ghost" size="icon" onClick={() => deleteEntry(e.id)}>
                           <Trash2 className="h-4 w-4 text-muted-foreground" />
                         </Button>
@@ -523,13 +530,15 @@ function HomePage() {
 
       <ManualEntryDialog
         open={manualOpen}
-        onOpenChange={setManualOpen}
+        onOpenChange={(v) => { setManualOpen(v); if (!v) setEditEntry(null); }}
         projects={projectsQ.data ?? []}
         actingOnOther={actingOnOther}
         targetUserId={targetUserId}
         targetLabel={targetUser?.email ?? null}
+        editEntry={editEntry}
       />
       <ProjectsDialog open={projectsOpen} onOpenChange={setProjectsOpen} projects={projectsQ.data ?? []} isAdmin={userIsAdmin} />
+      <ChangePasswordDialog open={passwordOpen} onOpenChange={setPasswordOpen} />
     </div>
   );
 }
