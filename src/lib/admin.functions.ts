@@ -459,6 +459,86 @@ export const adminDeleteTimeEntry = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export type UserEntry = {
+  id: string;
+  description: string | null;
+  start_time: string;
+  end_time: string | null;
+  project_id: string | null;
+  projects: { name: string; color: string } | null;
+};
+
+export const adminListEntriesForUser = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { userId: string }) => d)
+  .handler(async ({ data, context }): Promise<UserEntry[]> => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: rows, error } = await supabaseAdmin
+      .from("time_entries")
+      .select("id, description, start_time, end_time, project_id, projects(name, color)")
+      .eq("user_id", data.userId)
+      .order("start_time", { ascending: false })
+      .limit(200);
+    if (error) throw new Error(error.message);
+    return (rows ?? []) as unknown as UserEntry[];
+  });
+
+export const adminStartTimer = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { userId: string; projectId: string | null; description: string | null }) => d)
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const payload = {
+      user_id: data.userId,
+      project_id: data.projectId,
+      description: data.description,
+      start_time: new Date().toISOString(),
+    };
+    const { data: inserted, error } = await supabaseAdmin
+      .from("time_entries")
+      .insert(payload)
+      .select("id")
+      .single();
+    if (error) throw new Error(error.message);
+    await logAudit(supabaseAdmin, context, {
+      entry_id: inserted?.id ?? null,
+      entry_user_id: data.userId,
+      action: "create",
+      before_data: null,
+      after_data: payload,
+    });
+    return { ok: true };
+  });
+
+export const adminStopTimer = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string }) => d)
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: before } = await supabaseAdmin
+      .from("time_entries")
+      .select("user_id, project_id, description, start_time, end_time")
+      .eq("id", data.id)
+      .maybeSingle();
+    const after = { end_time: new Date().toISOString() };
+    const { error } = await supabaseAdmin
+      .from("time_entries")
+      .update(after)
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    await logAudit(supabaseAdmin, context, {
+      entry_id: data.id,
+      entry_user_id: (before?.user_id as string | undefined) ?? null,
+      action: "update",
+      before_data: before ?? null,
+      after_data: { ...(before ?? {}), ...after },
+    });
+    return { ok: true };
+  });
+
 async function logAudit(
   supabaseAdmin: any,
   context: { userId: string; claims?: any },
