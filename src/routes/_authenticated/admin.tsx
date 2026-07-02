@@ -1031,7 +1031,7 @@ function AdminPage() {
               disabled={updateMut.isPending || !editing}
               onClick={() => {
                 if (!editing) return;
-                const payload: { userId: string; email?: string; phone?: string; password?: string } = {
+                const payload: { userId: string; email?: string; phone?: string; firstName?: string; lastName?: string; password?: string } = {
                   userId: editing.user_id,
                 };
                 if (editEmail.trim() && editEmail.trim() !== (editing.email ?? "")) {
@@ -1039,6 +1039,12 @@ function AdminPage() {
                 }
                 if (editPhone.trim() !== (editing.phone ?? "")) {
                   payload.phone = editPhone;
+                }
+                if (editFirstName.trim() !== (editing.first_name ?? "")) {
+                  payload.firstName = editFirstName;
+                }
+                if (editLastName.trim() !== (editing.last_name ?? "")) {
+                  payload.lastName = editLastName;
                 }
                 if (editPassword) payload.password = editPassword;
                 // Save wage in parallel (always — admin may have changed only wages)
