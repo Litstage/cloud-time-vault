@@ -788,6 +788,14 @@ function AdminPage() {
                           <td className="px-3 py-2 whitespace-nowrap">
                             {new Date(r.start_time).toLocaleDateString("sv-SE")}
                           </td>
+                          <td className="px-3 py-2 whitespace-nowrap">
+                            {new Date(r.start_time).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" })}
+                          </td>
+                          <td className="px-3 py-2 whitespace-nowrap">
+                            {r.end_time
+                              ? new Date(r.end_time).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" })
+                              : "–"}
+                          </td>
                           <td className="px-3 py-2">
                             {r.project_color && (
                               <span style={{ color: r.project_color }}>● </span>
