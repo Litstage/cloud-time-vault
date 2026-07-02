@@ -573,6 +573,7 @@ function HomePage() {
         targetUserId={targetUserId}
         targetLabel={targetUser?.email ?? null}
         editEntry={editEntry}
+        selfUserId={selfUserId}
       />
       <ProjectsDialog open={projectsOpen} onOpenChange={setProjectsOpen} projects={projectsQ.data ?? []} isAdmin={userIsAdmin} />
       <ChangePasswordDialog open={passwordOpen} onOpenChange={setPasswordOpen} />
