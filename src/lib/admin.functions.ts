@@ -13,9 +13,66 @@ const SE_PARTS_FMT = new Intl.DateTimeFormat("en-GB", {
   minute: "2-digit",
   hour12: false,
 });
+const SE_DATE_TIME_PARTS_FMT = new Intl.DateTimeFormat("sv-SE", {
+  timeZone: "Europe/Stockholm",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hourCycle: "h23",
+});
 const WEEKDAY_MAP: Record<string, number> = {
   Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6,
 };
+function parseYmd(ymd: string): { year: number; month: number; day: number } {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd);
+  if (!m) throw new Error("Ogiltigt datum");
+  return { year: Number(m[1]), month: Number(m[2]), day: Number(m[3]) };
+}
+function parseHm(hm: string): { hour: number; minute: number } {
+  const m = /^(\d{2}):(\d{2})$/.exec(hm);
+  if (!m) throw new Error("Ogiltig tid");
+  return { hour: Number(m[1]), minute: Number(m[2]) };
+}
+function stockholmDateTimeParts(ms: number): { year: number; month: number; day: number; hour: number; minute: number; second: number } {
+  const parts = SE_DATE_TIME_PARTS_FMT.formatToParts(new Date(ms));
+  const out = { year: 0, month: 0, day: 0, hour: 0, minute: 0, second: 0 };
+  for (const p of parts) {
+    if (p.type === "year") out.year = Number(p.value);
+    else if (p.type === "month") out.month = Number(p.value);
+    else if (p.type === "day") out.day = Number(p.value);
+    else if (p.type === "hour") out.hour = Number(p.value) % 24;
+    else if (p.type === "minute") out.minute = Number(p.value);
+    else if (p.type === "second") out.second = Number(p.value);
+  }
+  return out;
+}
+function stockholmOffsetMinutes(ms: number): number {
+  const p = stockholmDateTimeParts(ms);
+  const localAsUtcMs = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second);
+  return Math.round((localAsUtcMs - ms) / 60_000);
+}
+function stockholmLocalToIso(ymd: string, hm: string): string {
+  const { year, month, day } = parseYmd(ymd);
+  const { hour, minute } = parseHm(hm);
+  const localAsUtcMs = Date.UTC(year, month - 1, day, hour, minute, 0, 0);
+  let offset = stockholmOffsetMinutes(localAsUtcMs);
+  let utcMs = localAsUtcMs - offset * 60_000;
+  const correctedOffset = stockholmOffsetMinutes(utcMs);
+  if (correctedOffset !== offset) utcMs = localAsUtcMs - correctedOffset * 60_000;
+  return new Date(utcMs).toISOString();
+}
+function addDaysYmd(ymd: string, days: number): string {
+  const { year, month, day } = parseYmd(ymd);
+  const d = new Date(Date.UTC(year, month - 1, day + days));
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+}
+function stockholmMonthKey(iso: string): string {
+  const p = stockholmDateTimeParts(new Date(iso).getTime());
+  return `${p.year}-${String(p.month).padStart(2, "0")}`;
+}
 function swedishParts(ms: number): { weekday: number; hour: number } {
   const parts = SE_PARTS_FMT.formatToParts(new Date(ms));
   let wd = 0, hour = 0;
@@ -921,11 +978,11 @@ export const getSummary = createServerFn({ method: "GET" })
     if (!isDate(data.from)) throw new Error("Ogiltigt fråndatum");
     const toDate = isDate(data.to) ? data.to : data.from;
     const fromTime = data.fromTime && /^\d{2}:\d{2}$/.test(data.fromTime) ? data.fromTime : "00:00";
-    const fromIso = new Date(`${data.from}T${fromTime}:00`).toISOString();
+    const fromIso = stockholmLocalToIso(data.from, fromTime);
     const hasToTime = data.toTime && /^\d{2}:\d{2}$/.test(data.toTime) && data.toTime !== "00:00";
     const toIso = hasToTime
-      ? new Date(`${toDate}T${data.toTime}:00`).toISOString()
-      : new Date(new Date(`${toDate}T00:00:00`).getTime() + 24 * 3600 * 1000).toISOString();
+      ? stockholmLocalToIso(toDate, data.toTime!)
+      : stockholmLocalToIso(addDaysYmd(toDate, 1), "00:00");
 
     let q = supabaseAdmin
       .from("time_entries")
@@ -1017,8 +1074,7 @@ export const getSummary = createServerFn({ method: "GET" })
       const uid = r.user_id as string;
       const wage = wages.get(uid) ?? { hourly_rate: 0, ob1_pct: 0, ob2_pct: 0, ob3_pct: 0 };
       const amount = computePay(split, wage);
-      const d = new Date(r.start_time as string);
-      const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      const monthKey = stockholmMonthKey(r.start_time as string);
       const gmKey = `${uid}|${monthKey}`;
       grossByUserMonth.set(gmKey, (grossByUserMonth.get(gmKey) ?? 0) + amount);
       facts.push({ row: r, ms, split, amount, userId: uid, monthKey });
@@ -1152,12 +1208,12 @@ export const getSummary = createServerFn({ method: "GET" })
       const proj = r.projects ?? null;
       const clientObj = proj?.clients ?? null;
       const clientRate = Number(clientObj?.hourly_rate ?? 0);
-      const ob1Rate = Number(clientObj?.ob1_rate ?? 0) || clientRate;
-      const ob2Rate = Number(clientObj?.ob2_rate ?? 0) || clientRate;
+      const ob1Rate = Number(clientObj?.ob1_rate ?? 0);
+      const ob2Rate = Number(clientObj?.ob2_rate ?? 0);
       const billSplit = splitEntryByBilling(r.start_time as string, r.end_time as string);
       const H = 3_600_000;
       const billing =
-        (billSplit.normalMs / H) * clientRate +
+        (ms / H) * clientRate +
         (billSplit.billOb1Ms / H) * ob1Rate +
         (billSplit.billOb2Ms / H) * ob2Rate;
       totalBilling += billing;
@@ -1225,11 +1281,11 @@ export const getSummaryEntries = createServerFn({ method: "GET" })
     if (!isDate(data.from)) throw new Error("Ogiltigt fråndatum");
     const toDate = isDate(data.to) ? data.to : data.from;
     const fromTime = data.fromTime && /^\d{2}:\d{2}$/.test(data.fromTime) ? data.fromTime : "00:00";
-    const fromIso = new Date(`${data.from}T${fromTime}:00`).toISOString();
+    const fromIso = stockholmLocalToIso(data.from, fromTime);
     const hasToTime = data.toTime && /^\d{2}:\d{2}$/.test(data.toTime) && data.toTime !== "00:00";
     const toIso = hasToTime
-      ? new Date(`${toDate}T${data.toTime}:00`).toISOString()
-      : new Date(new Date(`${toDate}T00:00:00`).getTime() + 24 * 3600 * 1000).toISOString();
+      ? stockholmLocalToIso(toDate, data.toTime!)
+      : stockholmLocalToIso(addDaysYmd(toDate, 1), "00:00");
 
     let q = supabaseAdmin
       .from("time_entries")
