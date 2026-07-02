@@ -535,6 +535,9 @@ function HomePage() {
                 <Card className="divide-y overflow-hidden p-0">
                   {list.map((e) => {
                     const dur = new Date(e.end_time!).getTime() - new Date(e.start_time).getTime();
+                    const ownerName = e.user_id && e.user_id !== selfUserId
+                      ? nameOf({ first_name: e.user_first_name, last_name: e.user_last_name, email: e.user_email, user_id: e.user_id })
+                      : null;
                     return (
                       <div key={e.id} className="flex items-center gap-3 px-4 py-3">
                         <div className="h-8 w-1 rounded-full" style={{ background: e.projects?.color ?? "var(--muted-foreground)" }} />
@@ -543,6 +546,13 @@ function HomePage() {
                           onClick={() => { setEditEntry(e); setManualOpen(true); }}
                           className="min-w-0 flex-1 text-left"
                         >
+                          {ownerName && (
+                            <div className="mb-0.5 flex items-center gap-1">
+                              <Badge variant="secondary" className="h-5 px-1.5 text-[10px] font-medium">
+                                {ownerName}
+                              </Badge>
+                            </div>
+                          )}
                           <div className="truncate text-sm font-medium">{e.description || "Ingen beskrivning"}</div>
                           <div className="text-xs text-muted-foreground">
                             {e.projects?.name ?? "Inget projekt"} · {new Date(e.start_time).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" })}–{new Date(e.end_time!).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" })}
