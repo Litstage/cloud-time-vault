@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Download, ShieldCheck, Check, X, Trash2, Shield, ShieldOff, RotateCcw, UserPlus, Pencil, Plus, CalendarIcon, History, FolderKanban, BarChart3, Clock, Copy } from "lucide-react";
+import { ArrowLeft, Download, ShieldCheck, Check, X, Trash2, Shield, ShieldOff, RotateCcw, UserPlus, Pencil, Plus, CalendarIcon, History, FolderKanban, BarChart3, Clock, Copy, Receipt } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -331,6 +331,8 @@ function AdminPage() {
   const [editOb3, setEditOb3] = useState("0");
   const [editEmployerFee, setEditEmployerFee] = useState("31.42");
   const [editTax, setEditTax] = useState("30");
+  const [editTaxTableNumber, setEditTaxTableNumber] = useState("32");
+  const [editTaxTableColumn, setEditTaxTableColumn] = useState("1");
 
   const updateMut = useMutation({
     mutationFn: (v: { userId: string; email?: string; phone?: string; firstName?: string; lastName?: string; password?: string }) =>
@@ -345,7 +347,7 @@ function AdminPage() {
   });
 
   const wageMut = useMutation({
-    mutationFn: (v: { user_id: string; hourly_rate: number; ob1_pct: number; ob2_pct: number; ob3_pct: number; employer_fee_pct: number; tax_pct: number }) =>
+    mutationFn: (v: { user_id: string; hourly_rate: number; ob1_pct: number; ob2_pct: number; ob3_pct: number; employer_fee_pct: number; tax_pct: number; tax_table_number: number; tax_table_column: number }) =>
       saveWage({ data: v }),
     onSuccess: () => toast.success("Löneuppgifter sparade"),
     onError: (e: Error) => toast.error(e.message),
@@ -438,6 +440,7 @@ function AdminPage() {
     setEditPassword("");
     setEditHourly("0"); setEditOb1("0"); setEditOb2("0"); setEditOb3("0");
     setEditEmployerFee("31.42"); setEditTax("30");
+    setEditTaxTableNumber("32"); setEditTaxTableColumn("1");
     fetchWage({ data: { userId: u.user_id } })
       .then((w) => {
         setEditHourly(String(w.hourly_rate));
@@ -446,6 +449,8 @@ function AdminPage() {
         setEditOb3(String(w.ob3_pct));
         setEditEmployerFee(String(w.employer_fee_pct));
         setEditTax(String(w.tax_pct));
+        setEditTaxTableNumber(String(w.tax_table_number));
+        setEditTaxTableColumn(String(w.tax_table_column));
       })
       .catch(() => {});
   }
