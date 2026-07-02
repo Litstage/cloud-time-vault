@@ -581,6 +581,14 @@ function AdminPage() {
                     />
                   </div>
                   <div className="space-y-1">
+                    <Label className="text-xs">Förnamn</Label>
+                    <Input value={newFirstName} onChange={(e) => setNewFirstName(e.target.value)} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Efternamn</Label>
+                    <Input value={newLastName} onChange={(e) => setNewLastName(e.target.value)} />
+                  </div>
+                  <div className="space-y-1">
                     <Label className="text-xs">Lösenord (minst 6 tecken)</Label>
                     <Input
                       type="text"
@@ -605,6 +613,8 @@ function AdminPage() {
                         email: newEmail,
                         password: newPassword,
                         phone: newPhone,
+                        firstName: newFirstName,
+                        lastName: newLastName,
                         makeAdmin: newMakeAdmin,
                       })
                     }
