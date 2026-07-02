@@ -5,6 +5,26 @@ import { parsePersonalNumber, employerFeeForEntry } from "@/lib/employer-fee";
 
 // Billing split for clients: OB1 = 22:00–07:00 alla dagar, OB2 = hela lör/sön.
 // Helg (OB2) vinner över natt (OB1) vid överlapp.
+// Utvärderas i tidszonen Europe/Stockholm (DST-säkert via Intl).
+const SE_PARTS_FMT = new Intl.DateTimeFormat("en-GB", {
+  timeZone: "Europe/Stockholm",
+  weekday: "short",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+});
+const WEEKDAY_MAP: Record<string, number> = {
+  Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6,
+};
+function swedishParts(ms: number): { weekday: number; hour: number } {
+  const parts = SE_PARTS_FMT.formatToParts(new Date(ms));
+  let wd = 0, hour = 0;
+  for (const p of parts) {
+    if (p.type === "weekday") wd = WEEKDAY_MAP[p.value] ?? 0;
+    else if (p.type === "hour") hour = Number(p.value) % 24;
+  }
+  return { weekday: wd, hour };
+}
 function splitEntryByBilling(startIso: string, endIso: string): { normalMs: number; billOb1Ms: number; billOb2Ms: number } {
   const out = { normalMs: 0, billOb1Ms: 0, billOb2Ms: 0 };
   const startMs = new Date(startIso).getTime();
@@ -16,9 +36,7 @@ function splitEntryByBilling(startIso: string, endIso: string): { normalMs: numb
     const nextMinute = Math.floor(cursor / MIN) * MIN + MIN;
     const next = Math.min(nextMinute, endMs);
     const seg = next - cursor;
-    const d = new Date(cursor);
-    const wd = d.getDay(); // 0=Sun..6=Sat
-    const h = d.getHours();
+    const { weekday: wd, hour: h } = swedishParts(cursor);
     if (wd === 0 || wd === 6) out.billOb2Ms += seg;
     else if (h < 7 || h >= 22) out.billOb1Ms += seg;
     else out.normalMs += seg;

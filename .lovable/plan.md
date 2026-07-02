@@ -1,31 +1,32 @@
-## OB-debitering per kund
+## Problem
 
-Två nya prisfält på kunder som används vid fakturering (påverkar inte lönesidan).
+Fakturering (och OB-lön) delas i "hinkar" per minut med `Date.getHours()` och `Date.getDay()`. På serversidan körs koden i UTC, så natt (22–07) och helg (lör/sön) utvärderas i fel tidszon. Resultat:
 
-### Databas (migration)
-Lägg till på `public.clients`:
-- `ob1_rate numeric not null default 0` — kr/tim mellan 22:00 och 07:00 alla dagar
-- `ob2_rate numeric not null default 0` — kr/tim hela lördag och söndag
+- Pass 22:00–07:00 svensk tid = 20:00–05:00 UTC → OB1-timmarna hamnar fel.
+- Ett pass som börjar t.ex. lördag 00:30 svensk tid ses som fredag 23:30 UTC → OB2 blir OB1 istället.
+- Sommartid vs vintertid ger olika fel (offset 1h eller 2h).
 
-`hourly_rate` fortsätter gälla för övrig tid (normaltid).
+Detta påverkar `totalBilling` och per-rad `billing` i sammanställningen — och samma bugg finns i OB-lönesplit (`splitEntryByOb`) som påverkar bruttolön / arbetsgivarkostnad / netto.
 
-### Prioritet vid överlapp
-En lördag kl 23:00 räknas som **OB2** (helg vinner över natt). Detta är standardregeln i sammanställningen.
+## Fix
 
-### Beräkningslogik (`src/lib/admin.functions.ts`)
-Ny hjälpfunktion `splitEntryByBilling(start, end)` som stegar minut för minut och delar tiden i tre hinkar: `normalMs`, `billOb1Ms`, `billOb2Ms` enligt reglerna ovan (helt fristående från `ob_rules`).
+Utvärdera veckodag och klockslag i tidszonen **Europe/Stockholm** istället för serverns lokala tid.
 
-I `getSummary` byts nuvarande `billing = (ms/h) * hourly_rate` mot:
-`billing = normalH*hourly_rate + ob1H*ob1_rate + ob2H*ob2_rate`
+### `src/lib/admin.functions.ts` — `splitEntryByBilling`
+- Lägg till hjälpare `getSwedishParts(date)` som via `Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Stockholm", weekday, hour, minute })` returnerar `{ weekday: 0-6, hour: 0-23 }`.
+- Byt `d.getDay()` / `d.getHours()` mot dessa värden.
+- Hantera DST automatiskt via Intl (ingen hårdkodad offset).
 
-Om kunden saknar OB-priser (0) faller de tillbaka på `hourly_rate` för konsekvent resultat.
-
-### Admin-UI (`src/routes/_authenticated/admin-projects.tsx`)
-I kunddialogen: två nya nummer-fält "OB1-pris (22–07)" och "OB2-pris (helg)" bredvid befintlig timdebitering.
-
-### Sammanställning / PDF
-Ingen struktur ändras — `totalBilling` och per-rad `billing` blir automatiskt korrekta. Ingen extra kolumn läggs till.
+### `src/lib/ob.ts` — `levelAt`
+- Samma fix: läs `weekday`/`hour`/`minute`/`second` i Europe/Stockholm istället för `date.getDay()` / `getHours()`.
+- OB-reglerna i DB är angivna i svensk tid, så matchningen blir korrekt året runt.
 
 ### Vad som INTE ändras
-- `ob_rules`-tabellen, lönekostnad, OB-påslag för anställda.
-- Tidregistrering, exports (CSV), månadsöversikt.
+- Databas / migrationer.
+- UI, PDF, rapportstruktur.
+- Formler för lön, arbetsgivaravgift, skatt.
+- Klientkoden (tidszonberäkning där sker redan lokalt i webbläsaren).
+
+## Verifiering
+
+Efter fix testar jag två poster i preview: ett pass 22:00–07:00 vardagsnatt och ett pass lör 00:30–03:00, och kontrollerar att OB1/OB2-fördelningen och faktureringssumman stämmer i sammanställningen.
