@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Download, ShieldCheck, Check, X, Trash2, Shield, ShieldOff, RotateCcw, UserPlus, Pencil, Plus, CalendarIcon, History, FolderKanban, BarChart3, Clock } from "lucide-react";
+import { ArrowLeft, Download, ShieldCheck, Check, X, Trash2, Shield, ShieldOff, RotateCcw, UserPlus, Pencil, Plus, CalendarIcon, History, FolderKanban, BarChart3, Clock, Copy } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -38,6 +38,7 @@ import {
   adminUpdateTimeEntry,
   adminDeleteTimeEntry,
   getAuditLog,
+  adminCopyTimeEntries,
   type AdminEntry,
   type ManagedUser,
   type AuditLogEntry,
