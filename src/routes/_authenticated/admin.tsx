@@ -369,6 +369,27 @@ function AdminPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const copyEntriesFn = useServerFn(adminCopyTimeEntries);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [copyOpen, setCopyOpen] = useState(false);
+  const [copyMode, setCopyMode] = useState<"copy" | "move">("copy");
+  const [copyTargets, setCopyTargets] = useState<Set<string>>(new Set());
+
+  const copyMut = useMutation({
+    mutationFn: (v: { entryIds: string[]; targetUserIds: string[]; mode: "copy" | "move" }) =>
+      copyEntriesFn({ data: v }),
+    onSuccess: (res: { created: number; moved: number }) => {
+      qc.invalidateQueries({ queryKey: ["admin-entries"] });
+      qc.invalidateQueries({ queryKey: ["audit-log"] });
+      if (res.moved) toast.success(`Flyttade ${res.moved} tidsposter`);
+      else toast.success(`Kopierade ${res.created} tidsposter`);
+      setCopyOpen(false);
+      setSelectedIds(new Set());
+      setCopyTargets(new Set());
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   function openEdit(u: ManagedUser) {
     setEditing(u);
     setEditEmail(u.email ?? "");
