@@ -464,7 +464,7 @@ function AdminPage() {
   const rows = entriesQ.data ?? [];
 
   const totals = useMemo(() => {
-    const perUser = new Map<string, { email: string | null; ms: number }>();
+    const perUser = new Map<string, { email: string | null; first_name: string | null; last_name: string | null; ms: number }>();
     let total = 0;
     for (const r of rows) {
       if (!r.end_time) continue;
@@ -473,6 +473,8 @@ function AdminPage() {
       const prev = perUser.get(r.user_id);
       perUser.set(r.user_id, {
         email: r.user_email,
+        first_name: r.user_first_name,
+        last_name: r.user_last_name,
         ms: (prev?.ms ?? 0) + ms,
       });
     }
