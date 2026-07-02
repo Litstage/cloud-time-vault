@@ -329,6 +329,8 @@ function AdminPage() {
   const [editOb1, setEditOb1] = useState("0");
   const [editOb2, setEditOb2] = useState("0");
   const [editOb3, setEditOb3] = useState("0");
+  const [editEmployerFee, setEditEmployerFee] = useState("31.42");
+  const [editTax, setEditTax] = useState("30");
 
   const updateMut = useMutation({
     mutationFn: (v: { userId: string; email?: string; phone?: string; firstName?: string; lastName?: string; password?: string }) =>
@@ -343,7 +345,7 @@ function AdminPage() {
   });
 
   const wageMut = useMutation({
-    mutationFn: (v: { user_id: string; hourly_rate: number; ob1_pct: number; ob2_pct: number; ob3_pct: number }) =>
+    mutationFn: (v: { user_id: string; hourly_rate: number; ob1_pct: number; ob2_pct: number; ob3_pct: number; employer_fee_pct: number; tax_pct: number }) =>
       saveWage({ data: v }),
     onSuccess: () => toast.success("Löneuppgifter sparade"),
     onError: (e: Error) => toast.error(e.message),
@@ -435,12 +437,15 @@ function AdminPage() {
     setEditLastName(u.last_name ?? "");
     setEditPassword("");
     setEditHourly("0"); setEditOb1("0"); setEditOb2("0"); setEditOb3("0");
+    setEditEmployerFee("31.42"); setEditTax("30");
     fetchWage({ data: { userId: u.user_id } })
       .then((w) => {
         setEditHourly(String(w.hourly_rate));
         setEditOb1(String(w.ob1_pct));
         setEditOb2(String(w.ob2_pct));
         setEditOb3(String(w.ob3_pct));
+        setEditEmployerFee(String(w.employer_fee_pct));
+        setEditTax(String(w.tax_pct));
       })
       .catch(() => {});
   }
