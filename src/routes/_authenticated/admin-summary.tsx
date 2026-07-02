@@ -64,6 +64,9 @@ function AdminSummaryPage() {
   const [pdfBusy, setPdfBusy] = useState(false);
   const [pdfDetail, setPdfDetail] = useState<"entries" | "daily">("entries");
   const [roundPdfHours, setRoundPdfHours] = useState(false);
+  const [showPerClient, setShowPerClient] = useState(true);
+  const [showPerProject, setShowPerProject] = useState(true);
+  const [showPerUser, setShowPerUser] = useState(true);
 
   const usersQ = useQuery({
     queryKey: ["managed-users"],
@@ -213,7 +216,6 @@ function AdminSummaryPage() {
         `Kund: ${clientId === "all" ? "Alla" : (clientsMap.get(clientId) ?? clientId)}`,
         `Projekt: ${projectId === "all" ? "Alla" : (projectsMap.get(projectId) ?? projectId)}`,
       ];
-      if (roundPdfHours) filterLines.push("Tider är avrundade till närmaste heltimme.");
       doc.text(filterLines, 40, 58);
 
       const totalsRows: [string, string][] = [
@@ -263,11 +265,11 @@ function AdminSummaryPage() {
         });
       };
 
-      addSection("Per kund", ["Kund", "Timmar", ...costCols],
+      if (showPerClient) addSection("Per kund", ["Kund", "Timmar", ...costCols],
         s.perClient.map((r) => [r.label, fmtH(r.ms), ...rowCostCells(r)]));
-      addSection("Per projekt", ["Projekt", "Kund", "Timmar", ...costCols],
+      if (showPerProject) addSection("Per projekt", ["Projekt", "Kund", "Timmar", ...costCols],
         s.perProject.map((r) => [r.label, r.sublabel ?? "", fmtH(r.ms), ...rowCostCells(r)]));
-      addSection("Per användare", ["Användare", "Timmar", ...costCols],
+      if (showPerUser) addSection("Per användare", ["Användare", "Timmar", ...costCols],
         s.perUser.map((r) => [r.label, fmtH(r.ms), ...rowCostCells(r)]));
 
       const fmtDate = (iso: string) => new Date(iso).toLocaleDateString("sv-SE");
@@ -417,6 +419,12 @@ function AdminSummaryPage() {
                       <CostToggle label="Arbetsgivarkostnad" checked={showEmployer} onChange={setShowEmployer} />
                       <CostToggle label="Debitering kund" checked={showBilling} onChange={setShowBilling} />
                       <div className="border-t pt-2">
+                        <div className="mb-1 text-xs font-medium text-muted-foreground">Kategorier</div>
+                        <CostToggle label="Per kund" checked={showPerClient} onChange={setShowPerClient} />
+                        <CostToggle label="Per projekt" checked={showPerProject} onChange={setShowPerProject} />
+                        <CostToggle label="Per användare" checked={showPerUser} onChange={setShowPerUser} />
+                      </div>
+                      <div className="border-t pt-2">
                         <CostToggle label="Avrunda timmar till heltimmar i PDF" checked={roundPdfHours} onChange={setRoundPdfHours} />
                       </div>
                       <div className="border-t pt-2">
@@ -463,9 +471,9 @@ function AdminSummaryPage() {
               )}
             </Card>
 
-            <SummarySection title="Per kund" rows={summaryQ.data?.perClient ?? []} loading={summaryQ.isLoading} totalMs={totalMs} showAmount={showGross} showNet={showNet} showBilling={showBilling} showEmployerCost={showEmployer} />
-            <SummarySection title="Per projekt" rows={summaryQ.data?.perProject ?? []} loading={summaryQ.isLoading} totalMs={totalMs} showSwatch showAmount={showGross} showNet={showNet} showBilling={showBilling} showEmployerCost={showEmployer} />
-            <SummarySection title="Per användare" rows={summaryQ.data?.perUser ?? []} loading={summaryQ.isLoading} totalMs={totalMs} showAmount={showGross} showNet={showNet} showBilling={showBilling} showEmployerCost={showEmployer} />
+            {showPerClient && <SummarySection title="Per kund" rows={summaryQ.data?.perClient ?? []} loading={summaryQ.isLoading} totalMs={totalMs} showAmount={showGross} showNet={showNet} showBilling={showBilling} showEmployerCost={showEmployer} />}
+            {showPerProject && <SummarySection title="Per projekt" rows={summaryQ.data?.perProject ?? []} loading={summaryQ.isLoading} totalMs={totalMs} showSwatch showAmount={showGross} showNet={showNet} showBilling={showBilling} showEmployerCost={showEmployer} />}
+            {showPerUser && <SummarySection title="Per användare" rows={summaryQ.data?.perUser ?? []} loading={summaryQ.isLoading} totalMs={totalMs} showAmount={showGross} showNet={showNet} showBilling={showBilling} showEmployerCost={showEmployer} />}
           </>
         )}
       </main>
