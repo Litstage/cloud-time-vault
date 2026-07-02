@@ -874,7 +874,7 @@ function AdminPage() {
       />
 
       <Dialog open={copyOpen} onOpenChange={setCopyOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Kopiera / flytta tider</DialogTitle>
           </DialogHeader>
@@ -986,7 +986,7 @@ function AdminPage() {
       </Dialog>
 
       <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Redigera användare</DialogTitle>
           </DialogHeader>
@@ -1329,7 +1329,7 @@ function EntryDialog(props: {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-xl p-6 gap-5">
+      <DialogContent className="sm:max-w-xl p-6 gap-5 max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl">{isEdit ? "Redigera tid" : "Lägg till tid"}</DialogTitle>
         </DialogHeader>
