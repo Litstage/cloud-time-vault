@@ -581,11 +581,13 @@ function HomePage() {
   );
 }
 
-function ManualEntryDialog({ open, onOpenChange, projects, actingOnOther, targetUserId, targetLabel, editEntry }: { open: boolean; onOpenChange: (v: boolean) => void; projects: Project[]; actingOnOther: boolean; targetUserId: string | null; targetLabel: string | null; editEntry: Entry | null }) {
+function ManualEntryDialog({ open, onOpenChange, projects, actingOnOther, targetUserId, targetLabel, editEntry, selfUserId }: { open: boolean; onOpenChange: (v: boolean) => void; projects: Project[]; actingOnOther: boolean; targetUserId: string | null; targetLabel: string | null; editEntry: Entry | null; selfUserId: string | null }) {
   const qc = useQueryClient();
   const adminCreate = useServerFn(adminCreateTimeEntry);
   const adminUpdate = useServerFn(adminUpdateTimeEntry);
   const isEdit = !!editEntry;
+  const editingOther = !!(editEntry?.user_id && selfUserId && editEntry.user_id !== selfUserId);
+  const effectiveActingOnOther = actingOnOther || editingOther;
   const [date, setDate] = useState<Date>(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
