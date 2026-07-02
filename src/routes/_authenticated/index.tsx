@@ -31,6 +31,7 @@ import {
   adminDeleteTimeEntry,
   adminCreateTimeEntry,
   adminUpdateTimeEntry,
+  getAllTimeEntries,
 } from "@/lib/admin.functions";
 import { Badge } from "@/components/ui/badge";
 
@@ -51,6 +52,10 @@ type Entry = {
   end_time: string | null;
   project_id: string | null;
   projects?: { name: string; color: string } | null;
+  user_id?: string | null;
+  user_first_name?: string | null;
+  user_last_name?: string | null;
+  user_email?: string | null;
 };
 
 function formatDuration(ms: number) {
@@ -133,6 +138,8 @@ function HomePage() {
   const startOtherFn = useServerFn(adminStartTimer);
   const stopOtherFn = useServerFn(adminStopTimer);
   const deleteOtherFn = useServerFn(adminDeleteTimeEntry);
+  const listAllFn = useServerFn(getAllTimeEntries);
+  const adminDeleteFn = useServerFn(adminDeleteTimeEntry);
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -149,11 +156,31 @@ function HomePage() {
   });
 
   const entriesQ = useQuery({
-    queryKey: ["entries", targetUserId ?? "self", actingOnOther ? "admin" : "self"],
+    queryKey: [
+      "entries",
+      userIsAdmin ? "admin" : "user",
+      selfUserId ?? "anon",
+      actingOnOther ? `other:${targetUserId}` : "self",
+    ],
     queryFn: async (): Promise<Entry[]> => {
       if (actingOnOther && targetUserId) {
         const rows = await listOtherFn({ data: { userId: targetUserId } });
         return rows as unknown as Entry[];
+      }
+      if (userIsAdmin) {
+        const rows = await listAllFn({ data: undefined });
+        return rows.map((r) => ({
+          id: r.id,
+          description: r.description,
+          start_time: r.start_time,
+          end_time: r.end_time,
+          project_id: r.project_id,
+          projects: r.project_name ? { name: r.project_name, color: r.project_color ?? "" } : null,
+          user_id: r.user_id,
+          user_first_name: r.user_first_name,
+          user_last_name: r.user_last_name,
+          user_email: r.user_email,
+        }));
       }
       const { data, error } = await supabase
         .from("time_entries")
@@ -163,10 +190,12 @@ function HomePage() {
       if (error) throw error;
       return (data ?? []) as unknown as Entry[];
     },
-    enabled: !userIsAdmin || targetUserId !== null,
+    enabled: !userIsAdmin || targetUserId !== null || adminQ.isFetched,
   });
 
-  const running = entriesQ.data?.find((e) => !e.end_time) ?? null;
+  const running = entriesQ.data?.find(
+    (e) => !e.end_time && (!e.user_id || e.user_id === selfUserId || e.user_id === targetUserId),
+  ) ?? null;
 
   async function startTimer() {
     if (actingOnOther && targetUserId) {
@@ -215,12 +244,14 @@ function HomePage() {
     qc.invalidateQueries({ queryKey: ["entries"] });
   }
 
-  async function deleteEntry(id: string) {
-    if (actingOnOther) {
+  async function deleteEntry(e: Entry) {
+    const id = e.id;
+    const isOtherRow = !!e.user_id && !!selfUserId && e.user_id !== selfUserId;
+    if (actingOnOther || isOtherRow) {
       try {
-        await deleteOtherFn({ data: { id } });
-      } catch (e) {
-        return toast.error(e instanceof Error ? e.message : "Kunde inte ta bort");
+        await adminDeleteFn({ data: { id } });
+      } catch (err) {
+        return toast.error(err instanceof Error ? err.message : "Kunde inte ta bort");
       }
     } else {
       const { error } = await supabase.from("time_entries").delete().eq("id", id);
@@ -504,6 +535,9 @@ function HomePage() {
                 <Card className="divide-y overflow-hidden p-0">
                   {list.map((e) => {
                     const dur = new Date(e.end_time!).getTime() - new Date(e.start_time).getTime();
+                    const ownerName = e.user_id && e.user_id !== selfUserId
+                      ? nameOf({ first_name: e.user_first_name, last_name: e.user_last_name, email: e.user_email, user_id: e.user_id })
+                      : null;
                     return (
                       <div key={e.id} className="flex items-center gap-3 px-4 py-3">
                         <div className="h-8 w-1 rounded-full" style={{ background: e.projects?.color ?? "var(--muted-foreground)" }} />
@@ -512,6 +546,13 @@ function HomePage() {
                           onClick={() => { setEditEntry(e); setManualOpen(true); }}
                           className="min-w-0 flex-1 text-left"
                         >
+                          {ownerName && (
+                            <div className="mb-0.5 flex items-center gap-1">
+                              <Badge variant="secondary" className="h-5 px-1.5 text-[10px] font-medium">
+                                {ownerName}
+                              </Badge>
+                            </div>
+                          )}
                           <div className="truncate text-sm font-medium">{e.description || "Ingen beskrivning"}</div>
                           <div className="text-xs text-muted-foreground">
                             {e.projects?.name ?? "Inget projekt"} · {new Date(e.start_time).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" })}–{new Date(e.end_time!).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" })}
@@ -521,7 +562,7 @@ function HomePage() {
                         <Button variant="ghost" size="icon" onClick={() => { setEditEntry(e); setManualOpen(true); }}>
                           <Pencil className="h-4 w-4 text-muted-foreground" />
                         </Button>
-                        <Button variant="ghost" size="icon" onClick={() => deleteEntry(e.id)}>
+                        <Button variant="ghost" size="icon" onClick={() => deleteEntry(e)}>
                           <Trash2 className="h-4 w-4 text-muted-foreground" />
                         </Button>
                       </div>
@@ -542,6 +583,7 @@ function HomePage() {
         targetUserId={targetUserId}
         targetLabel={targetUser?.email ?? null}
         editEntry={editEntry}
+        selfUserId={selfUserId}
       />
       <ProjectsDialog open={projectsOpen} onOpenChange={setProjectsOpen} projects={projectsQ.data ?? []} isAdmin={userIsAdmin} />
       <ChangePasswordDialog open={passwordOpen} onOpenChange={setPasswordOpen} />
@@ -549,11 +591,13 @@ function HomePage() {
   );
 }
 
-function ManualEntryDialog({ open, onOpenChange, projects, actingOnOther, targetUserId, targetLabel, editEntry }: { open: boolean; onOpenChange: (v: boolean) => void; projects: Project[]; actingOnOther: boolean; targetUserId: string | null; targetLabel: string | null; editEntry: Entry | null }) {
+function ManualEntryDialog({ open, onOpenChange, projects, actingOnOther, targetUserId, targetLabel, editEntry, selfUserId }: { open: boolean; onOpenChange: (v: boolean) => void; projects: Project[]; actingOnOther: boolean; targetUserId: string | null; targetLabel: string | null; editEntry: Entry | null; selfUserId: string | null }) {
   const qc = useQueryClient();
   const adminCreate = useServerFn(adminCreateTimeEntry);
   const adminUpdate = useServerFn(adminUpdateTimeEntry);
   const isEdit = !!editEntry;
+  const editingOther = !!(editEntry?.user_id && selfUserId && editEntry.user_id !== selfUserId);
+  const effectiveActingOnOther = actingOnOther || editingOther;
   const [date, setDate] = useState<Date>(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -638,7 +682,7 @@ function ManualEntryDialog({ open, onOpenChange, projects, actingOnOther, target
     if (!endNorm) return toast.error("Ogiltig sluttid");
     const isoDay = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
     if (isEdit && editEntry) {
-      if (actingOnOther) {
+      if (effectiveActingOnOther) {
         try {
           const startIso = new Date(`${isoDay}T${startNorm}`).toISOString();
           let endDate = new Date(`${isoDay}T${endNorm}`);
