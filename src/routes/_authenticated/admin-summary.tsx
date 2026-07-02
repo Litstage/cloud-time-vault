@@ -455,12 +455,14 @@ function AdminSummaryPage() {
               </div>
               {s && (
                 <>
-                  <div className="grid grid-cols-2 gap-2 rounded-md bg-muted/40 p-3 text-xs sm:grid-cols-4">
-                    <Stat label="Normal" value={`${fmtHours(s.totalNormalMs)} h`} />
-                    <Stat label="OB1" value={`${fmtHours(s.totalOb1Ms)} h`} />
-                    <Stat label="OB2" value={`${fmtHours(s.totalOb2Ms)} h`} />
-                    <Stat label="OB3" value={`${fmtHours(s.totalOb3Ms)} h`} />
-                  </div>
+                  {showOb && (
+                    <div className="grid grid-cols-2 gap-2 rounded-md bg-muted/40 p-3 text-xs sm:grid-cols-4">
+                      <Stat label="Normal" value={`${fmtHours(s.totalNormalMs)} h`} />
+                      <Stat label="OB1" value={`${fmtHours(s.totalOb1Ms)} h`} />
+                      <Stat label="OB2" value={`${fmtHours(s.totalOb2Ms)} h`} />
+                      <Stat label="OB3" value={`${fmtHours(s.totalOb3Ms)} h`} />
+                    </div>
+                  )}
                   {(showGross || showNet || showEmployer || showBilling) && (
                     <>
                       <div className="grid grid-cols-2 gap-2 rounded-md bg-muted/40 p-3 text-xs sm:grid-cols-4">
@@ -480,9 +482,9 @@ function AdminSummaryPage() {
               )}
             </Card>
 
-            {showPerClient && <SummarySection title="Per kund" rows={summaryQ.data?.perClient ?? []} loading={summaryQ.isLoading} totalMs={totalMs} showAmount={showGross} showNet={showNet} showBilling={showBilling} showEmployerCost={showEmployer} />}
-            {showPerProject && <SummarySection title="Per projekt" rows={summaryQ.data?.perProject ?? []} loading={summaryQ.isLoading} totalMs={totalMs} showSwatch showAmount={showGross} showNet={showNet} showBilling={showBilling} showEmployerCost={showEmployer} />}
-            {showPerUser && <SummarySection title="Per användare" rows={summaryQ.data?.perUser ?? []} loading={summaryQ.isLoading} totalMs={totalMs} showAmount={showGross} showNet={showNet} showBilling={showBilling} showEmployerCost={showEmployer} />}
+            {showPerClient && <SummarySection title="Per kund" rows={summaryQ.data?.perClient ?? []} loading={summaryQ.isLoading} totalMs={totalMs} showAmount={showGross} showNet={showNet} showBilling={showBilling} showEmployerCost={showEmployer} showOb={showOb} />}
+            {showPerProject && <SummarySection title="Per projekt" rows={summaryQ.data?.perProject ?? []} loading={summaryQ.isLoading} totalMs={totalMs} showSwatch showAmount={showGross} showNet={showNet} showBilling={showBilling} showEmployerCost={showEmployer} showOb={showOb} />}
+            {showPerUser && <SummarySection title="Per användare" rows={summaryQ.data?.perUser ?? []} loading={summaryQ.isLoading} totalMs={totalMs} showAmount={showGross} showNet={showNet} showBilling={showBilling} showEmployerCost={showEmployer} showOb={showOb} />}
           </>
         )}
       </main>
@@ -532,10 +534,10 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function SummarySection({ title, rows, loading, totalMs, showSwatch, showAmount, showBilling, showEmployerCost, showNet }: {
+function SummarySection({ title, rows, loading, totalMs, showSwatch, showAmount, showBilling, showEmployerCost, showNet, showOb }: {
   title: string; rows: SummaryRow[]; loading: boolean; totalMs: number;
   showSwatch?: boolean; showAmount?: boolean; showBilling?: boolean;
-  showEmployerCost?: boolean; showNet?: boolean;
+  showEmployerCost?: boolean; showNet?: boolean; showOb?: boolean;
 }) {
   return (
     <section className="space-y-2">
@@ -575,12 +577,14 @@ function SummarySection({ title, rows, loading, totalMs, showSwatch, showAmount,
                     )}
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
-                  <span>Normal {fmtHours(r.normalMs ?? 0)} h</span>
-                  <span>OB1 {fmtHours(r.ob1Ms ?? 0)} h</span>
-                  <span>OB2 {fmtHours(r.ob2Ms ?? 0)} h</span>
-                  <span>OB3 {fmtHours(r.ob3Ms ?? 0)} h</span>
-                </div>
+                {showOb && (
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                    <span>Normal {fmtHours(r.normalMs ?? 0)} h</span>
+                    <span>OB1 {fmtHours(r.ob1Ms ?? 0)} h</span>
+                    <span>OB2 {fmtHours(r.ob2Ms ?? 0)} h</span>
+                    <span>OB3 {fmtHours(r.ob3Ms ?? 0)} h</span>
+                  </div>
+                )}
                 <div className="h-1.5 overflow-hidden rounded-full bg-muted">
                   <div className="h-full rounded-full bg-primary" style={{ width: `${pct}%` }} />
                 </div>
