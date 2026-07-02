@@ -221,8 +221,8 @@ function AdminSummaryPage() {
 
       const totalsRows: [string, string][] = [
         ["Total tid", `${fmtH(s.totalMs)} h (${s.totalCount} poster)`],
-        ["Normal / OB1 / OB2 / OB3", `${fmtH(s.totalNormalMs)} / ${fmtH(s.totalOb1Ms)} / ${fmtH(s.totalOb2Ms)} / ${fmtH(s.totalOb3Ms)} h`],
       ];
+      if (showOb) totalsRows.push(["Normal / OB1 / OB2 / OB3", `${fmtH(s.totalNormalMs)} / ${fmtH(s.totalOb1Ms)} / ${fmtH(s.totalOb2Ms)} / ${fmtH(s.totalOb3Ms)} h`]);
       if (showGross) totalsRows.push(["Bruttolön", `${fmtKr(s.totalAmount)} kr`]);
       if (showNet) totalsRows.push(["Netto efter skatt", `${fmtKr(s.totalNet)} kr`]);
       if (showEmployer) totalsRows.push(["Arbetsgivarkostnad", `${fmtKr(s.totalEmployerCost)} kr`]);
@@ -419,6 +419,7 @@ function AdminSummaryPage() {
                       <CostToggle label="Netto efter skatt" checked={showNet} onChange={setShowNet} />
                       <CostToggle label="Arbetsgivarkostnad" checked={showEmployer} onChange={setShowEmployer} />
                       <CostToggle label="Debitering kund" checked={showBilling} onChange={setShowBilling} />
+                      <CostToggle label="OB-timmar" checked={showOb} onChange={setShowOb} />
                       <div className="border-t pt-2">
                         <div className="mb-1 text-xs font-medium text-muted-foreground">Kategorier</div>
                         <CostToggle label="Per kund" checked={showPerClient} onChange={setShowPerClient} />
