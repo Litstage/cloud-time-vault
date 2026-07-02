@@ -242,8 +242,47 @@ export const fetchTaxTableFromSkatteverket = createServerFn({ method: "POST" })
         "Ingen automatisk nedladdning från Skatteverket. Ladda ner tabellen från skatteverket.se och klistra in CSV-innehållet.",
       );
     }
-    const res = await fetch(data.url, { headers: { "user-agent": "tider.litstage.se" } });
+    // SSRF hardening: only allow HTTPS to skatteverket.se (or subdomains).
+    let parsed: URL;
+    try {
+      parsed = new URL(data.url);
+    } catch {
+      throw new Error("Ogiltig URL");
+    }
+    if (parsed.protocol !== "https:") {
+      throw new Error("Endast HTTPS-URL:er tillåts");
+    }
+    const host = parsed.hostname.toLowerCase();
+    if (host !== "skatteverket.se" && !host.endsWith(".skatteverket.se")) {
+      throw new Error("Endast URL:er på skatteverket.se tillåts");
+    }
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    let res: Response;
+    try {
+      res = await fetch(parsed.toString(), {
+        headers: { "user-agent": "tider.litstage.se" },
+        signal: controller.signal,
+        redirect: "error",
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
     if (!res.ok) throw new Error(`Nedladdning misslyckades (${res.status})`);
-    const text = await res.text();
+    const contentType = (res.headers.get("content-type") ?? "").toLowerCase();
+    if (contentType && !/text\/|csv|octet-stream/.test(contentType)) {
+      throw new Error("Oväntad innehållstyp från Skatteverket");
+    }
+    // Cap response at ~5 MB to avoid unbounded reads.
+    const MAX_BYTES = 5 * 1024 * 1024;
+    const buf = await res.arrayBuffer();
+    if (buf.byteLength > MAX_BYTES) {
+      throw new Error("Filen är för stor");
+    }
+    const text = new TextDecoder("utf-8").decode(buf);
+    // Sanity check that the payload looks like CSV/text (has digits and separators).
+    if (!/[0-9]/.test(text) || !/[;,\t]/.test(text)) {
+      throw new Error("Nedladdad fil ser inte ut som en CSV");
+    }
     return { csv: text };
   });
