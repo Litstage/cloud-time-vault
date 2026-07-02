@@ -138,6 +138,8 @@ function HomePage() {
   const startOtherFn = useServerFn(adminStartTimer);
   const stopOtherFn = useServerFn(adminStopTimer);
   const deleteOtherFn = useServerFn(adminDeleteTimeEntry);
+  const listAllFn = useServerFn(getAllTimeEntries);
+  const adminDeleteFn = useServerFn(adminDeleteTimeEntry);
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -154,11 +156,31 @@ function HomePage() {
   });
 
   const entriesQ = useQuery({
-    queryKey: ["entries", targetUserId ?? "self", actingOnOther ? "admin" : "self"],
+    queryKey: [
+      "entries",
+      userIsAdmin ? "admin" : "user",
+      selfUserId ?? "anon",
+      actingOnOther ? `other:${targetUserId}` : "self",
+    ],
     queryFn: async (): Promise<Entry[]> => {
       if (actingOnOther && targetUserId) {
         const rows = await listOtherFn({ data: { userId: targetUserId } });
         return rows as unknown as Entry[];
+      }
+      if (userIsAdmin) {
+        const rows = await listAllFn({ data: undefined });
+        return rows.map((r) => ({
+          id: r.id,
+          description: r.description,
+          start_time: r.start_time,
+          end_time: r.end_time,
+          project_id: r.project_id,
+          projects: r.project_name ? { name: r.project_name, color: r.project_color ?? "" } : null,
+          user_id: r.user_id,
+          user_first_name: r.user_first_name,
+          user_last_name: r.user_last_name,
+          user_email: r.user_email,
+        }));
       }
       const { data, error } = await supabase
         .from("time_entries")
@@ -168,10 +190,12 @@ function HomePage() {
       if (error) throw error;
       return (data ?? []) as unknown as Entry[];
     },
-    enabled: !userIsAdmin || targetUserId !== null,
+    enabled: !userIsAdmin || targetUserId !== null || adminQ.isFetched,
   });
 
-  const running = entriesQ.data?.find((e) => !e.end_time) ?? null;
+  const running = entriesQ.data?.find(
+    (e) => !e.end_time && (!e.user_id || e.user_id === selfUserId || e.user_id === targetUserId),
+  ) ?? null;
 
   async function startTimer() {
     if (actingOnOther && targetUserId) {
