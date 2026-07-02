@@ -1,36 +1,37 @@
-# Kopiera tider mellan användare (admin)
+## Mål
+Visa vems tid en post gäller (för admin) och lägg till för-/efternamn på användare.
 
-## Omfattning
-- Endast admin. Funktionen läggs till i admin-vyn (`src/routes/_authenticated/admin.tsx`).
-- Två sätt att välja källposter: markera enskilda rader **eller** välja intervall (dag/vecka/månad) för en användare.
-- Admin väljer om posterna ska **kopieras** (original kvar) eller **flyttas** (byter ägare).
-- Mottagare: en eller flera användare samtidigt (checklista). Vid flera mottagare tvingas läget till "kopiera".
+## Databas
+Nya kolumner på `user_approvals` (befintlig tabell där vi redan lagrar phone m.m. per användare — bekräftas vid implementation, annars läggs de på lämplig plats):
+- `first_name text`
+- `last_name text`
 
-## UI-ändringar (`admin.tsx`)
-- Checkboxar per rad i tidslistan + "Markera alla i vyn".
-- Ny knapp **"Kopiera/Flytta tider…"** som öppnar en dialog:
-  - Källa: visar antal markerade poster, alternativt intervall-läge (välj användare + dag/vecka/månad + datum).
-  - Läge: radioknappar "Kopiera" / "Flytta" (Flytta inaktiveras om >1 mottagare).
-  - Mottagare: multi-select med checkboxar över godkända användare (källanvändaren döljs).
-  - Bekräftelse-summering: "Kopierar N poster till M användare".
-- Efter körning: toast med resultat + query-invalidation för tidslistan och audit-loggen.
+Ingen ny tabell behövs.
 
-## Server-funktioner (`src/lib/admin.functions.ts`)
-Ny funktion `adminCopyTimeEntries` med `requireSupabaseAuth` + admin-check (samma mönster som befintliga admin-fn):
-- Input: `{ entryIds: string[]; targetUserIds: string[]; mode: 'copy' | 'move' }`.
-- Validering: minst 1 entry + 1 target; `mode='move'` kräver exakt 1 target; mottagare måste vara godkända.
-- Hämtar källposterna via `supabaseAdmin` (bypass RLS).
-- **Copy**: insert av nya rader per target med samma `project_id`, `start_time`, `end_time`, `description`; ny `id`/`created_at`. Audit-logga varje ny rad som `action='admin_copy'` med `before_data=null`, `after_data=<ny rad>` och referens till källans `id` i `after_data.copied_from`.
-- **Move**: update av `user_id` på befintliga rader till target. Audit-logga som `action='admin_move'` med före/efter-snapshot.
-- Returnerar `{ created: number; moved: number }`.
+## Backend (`src/lib/admin.functions.ts`)
+- `listManagedUsers` returnerar redan användare — utöka med `first_name`, `last_name`.
+- `createManagedUser` / `updateManagedUser`: acceptera valfria `firstName`/`lastName` och spara.
+- `getAllTimeEntries` (admin-listan): joina in namn så varje post har `user_first_name`, `user_last_name`, `user_email`.
+- Sammanställningar (`getSummary`, audit-listor) fortsätter fungera; visa namn där e-post visas idag när namn finns.
 
-Ingen ny funktion för intervall-läget: klienten expanderar valt intervall till `entryIds` innan anropet (samma query som listan redan använder).
+## UI
 
-## Databas / RLS
-- Ingen schemaändring. `time_entries` tillåter redan admin-insert/-update via befintliga admin-policies, och `time_entry_audit` skrivs redan av admin-fn.
-- `action`-kolumnen i `time_entry_audit` är fri text → nya värden `admin_copy` / `admin_move` fungerar utan migration.
+### Auth / registrering (`src/routes/auth.tsx`)
+- Lägg till frivilliga fält **Förnamn** och **Efternamn** i signup-formuläret. Skickas till `supabase.auth.signUp` som `options.data` och plockas upp av trigger/serverfunktion vid godkännande — eller sparas direkt via ny serverfn.
+
+### Admin – användarhantering (`src/routes/_authenticated/admin.tsx`)
+- Skapa-användare-dialog och redigera-dialog: nya frivilliga fält Förnamn/Efternamn.
+- Användarlistan: visa "Förnamn Efternamn" som primär text, e-post som sekundär.
+- Rader som saknar namn markeras tydligt (badge "Namn saknas") tills admin fyllt i.
+
+### Admin – "Alla poster" (`admin.tsx`)
+- Varje rad visar namnet på användaren (fallback: e-post + badge "Namn saknas").
+
+### Startsidan (`src/routes/_authenticated/index.tsx`)
+- Vanliga användare: oförändrat (inget namn behövs på egna poster).
+- Admin: varje post i listan visar en liten etikett med namnet på ägaren (så det syns när admin registrerat tid åt någon annan). Detekteras via befintlig `userIsAdmin`.
 
 ## Utanför scope
-- Ingen ändring av vanliga användares behörigheter.
-- Ingen sammanslagning/dedup av överlappande tider hos mottagaren – posterna läggs till som de är.
-- Ingen ändring av projekt-kopplingen (samma `project_id` behålls även om målet inte "äger" projektet; projekt är delade).
+- Inga ändringar av behörigheter eller RLS.
+- Ingen migrering av befintliga namn från e-post.
+- Ingen ändring av export/CSV-format (kan läggas till senare vid behov).
