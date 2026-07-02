@@ -543,9 +543,11 @@ function HomePage() {
   );
 }
 
-function ManualEntryDialog({ open, onOpenChange, projects, actingOnOther, targetUserId, targetLabel }: { open: boolean; onOpenChange: (v: boolean) => void; projects: Project[]; actingOnOther: boolean; targetUserId: string | null; targetLabel: string | null }) {
+function ManualEntryDialog({ open, onOpenChange, projects, actingOnOther, targetUserId, targetLabel, editEntry }: { open: boolean; onOpenChange: (v: boolean) => void; projects: Project[]; actingOnOther: boolean; targetUserId: string | null; targetLabel: string | null; editEntry: Entry | null }) {
   const qc = useQueryClient();
   const adminCreate = useServerFn(adminCreateTimeEntry);
+  const adminUpdate = useServerFn(adminUpdateTimeEntry);
+  const isEdit = !!editEntry;
   const [date, setDate] = useState<Date>(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -559,6 +561,28 @@ function ManualEntryDialog({ open, onOpenChange, projects, actingOnOther, target
   const [end, setEnd] = useState("10:00");
   const [description, setDescription] = useState("");
   const [projectId, setProjectId] = useState("none");
+
+  useEffect(() => {
+    if (!open) return;
+    if (editEntry) {
+      const s = new Date(editEntry.start_time);
+      const e = editEntry.end_time ? new Date(editEntry.end_time) : s;
+      const ymd = `${s.getFullYear()}-${String(s.getMonth() + 1).padStart(2, "0")}-${String(s.getDate()).padStart(2, "0")}`;
+      const hhmm = (d: Date) => `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+      setDate(new Date(s.getFullYear(), s.getMonth(), s.getDate()));
+      setDateText(ymd);
+      setStart(hhmm(s));
+      setEnd(hhmm(e));
+      setDescription(editEntry.description ?? "");
+      setProjectId(editEntry.project_id ?? "none");
+    } else {
+      const d = new Date(); d.setHours(0, 0, 0, 0);
+      setDate(d);
+      setDateText(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`);
+      setStart("09:00"); setEnd("10:00");
+      setDescription(""); setProjectId("none");
+    }
+  }, [editEntry, open]);
 
   function syncDate(d: Date) {
     setDate(d);
@@ -607,6 +631,41 @@ function ManualEntryDialog({ open, onOpenChange, projects, actingOnOther, target
     if (!startNorm) return toast.error("Ogiltig starttid");
     if (!endNorm) return toast.error("Ogiltig sluttid");
     const isoDay = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    if (isEdit && editEntry) {
+      if (actingOnOther) {
+        try {
+          await adminUpdate({
+            data: {
+              id: editEntry.id,
+              projectId: projectId === "none" ? null : projectId,
+              description: description || null,
+              date: isoDay,
+              start: startNorm,
+              end: endNorm,
+            },
+          });
+        } catch (e) {
+          return toast.error(e instanceof Error ? e.message : "Kunde inte spara");
+        }
+      } else {
+        const startIso = new Date(`${isoDay}T${startNorm}`).toISOString();
+        let endDate = new Date(`${isoDay}T${endNorm}`);
+        if (endDate.getTime() <= new Date(startIso).getTime()) {
+          endDate = new Date(endDate.getTime() + 24 * 3600 * 1000);
+        }
+        const { error } = await supabase.from("time_entries").update({
+          description: description || null,
+          project_id: projectId === "none" ? null : projectId,
+          start_time: startIso,
+          end_time: endDate.toISOString(),
+        }).eq("id", editEntry.id);
+        if (error) return toast.error(error.message);
+      }
+      toast.success("Tid uppdaterad");
+      qc.invalidateQueries({ queryKey: ["entries"] });
+      onOpenChange(false);
+      return;
+    }
     if (actingOnOther && targetUserId) {
       try {
         await adminCreate({
@@ -650,7 +709,7 @@ function ManualEntryDialog({ open, onOpenChange, projects, actingOnOther, target
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-xl p-6 gap-5">
         <DialogHeader>
-          <DialogTitle className="text-xl">Lägg till tid</DialogTitle>
+          <DialogTitle className="text-xl">{isEdit ? "Redigera tid" : "Lägg till tid"}</DialogTitle>
           {actingOnOther && targetLabel && (
             <p className="text-xs text-muted-foreground">För: {targetLabel}</p>
           )}
