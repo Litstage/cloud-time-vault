@@ -149,3 +149,13 @@
     color: var(--color-foreground);
   }
 }
+
+/* Lovable badge: only show for admin users. */
+body:not(.admin-user) aside#lovable-badge {
+  display: none !important;
+}
+
+body.admin-user aside#lovable-badge {
+  display: flex;
+}
+
