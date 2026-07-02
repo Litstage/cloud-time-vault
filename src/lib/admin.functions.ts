@@ -1139,7 +1139,9 @@ export const getSummary = createServerFn({ method: "GET" })
       const pu = perUser.get(uid);
       if (pu) { pu.ms += ms; pu.count += 1; addInto(pu, split, amount, billing, employerCost, net); }
       else {
-        const row: SummaryRow = { key: uid, label: emails.get(uid) ?? uid, ms, count: 1 };
+        const emailForUid = emails.get(uid) ?? null;
+        const uidLabel = firstNames.get(uid) || (emailForUid ? emailForUid.split("@")[0] : uid);
+        const row: SummaryRow = { key: uid, label: uidLabel, ms, count: 1 };
         addInto(row, split, amount, billing, employerCost, net);
         perUser.set(uid, row);
       }
