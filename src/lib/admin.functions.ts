@@ -800,6 +800,7 @@ export type UserWage = {
   tax_pct: number;
   tax_table_number: number;
   tax_table_column: number;
+  personal_number: string | null;
 };
 
 export const getUserWage = createServerFn({ method: "GET" })
@@ -825,6 +826,7 @@ export const getUserWage = createServerFn({ method: "GET" })
       tax_pct: Number(r?.tax_pct ?? 30),
       tax_table_number: Number(r?.tax_table_number ?? 32),
       tax_table_column: Number(r?.tax_table_column ?? 1),
+      personal_number: (r?.personal_number ?? null) as string | null,
     };
   });
 
@@ -845,6 +847,7 @@ export const upsertUserWage = createServerFn({ method: "POST" })
         tax_pct: data.tax_pct,
         tax_table_number: data.tax_table_number,
         tax_table_column: data.tax_table_column,
+        personal_number: data.personal_number && data.personal_number.trim() ? data.personal_number.trim() : null,
       },
       { onConflict: "user_id" },
     );
