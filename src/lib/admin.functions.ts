@@ -917,6 +917,8 @@ export const getSummary = createServerFn({ method: "GET" })
     const wages = new Map<string, Wage>();
     const feeMap = new Map<string, number>();
     const taxMap = new Map<string, number>();
+    const tableNumMap = new Map<string, number>();
+    const tableColMap = new Map<string, number>();
     for (const w of ((wageRows as any[]) ?? [])) {
       wages.set(w.user_id as string, {
         hourly_rate: Number(w.hourly_rate ?? 0),
@@ -926,7 +928,100 @@ export const getSummary = createServerFn({ method: "GET" })
       });
       feeMap.set(w.user_id as string, Number(w.employer_fee_pct ?? 31.42));
       taxMap.set(w.user_id as string, Number(w.tax_pct ?? 30));
+      tableNumMap.set(w.user_id as string, Number(w.tax_table_number ?? 32));
+      tableColMap.set(w.user_id as string, Number(w.tax_table_column ?? 1));
     }
+
+    // Pre-compute entry facts (amount, month, user) so we can determine per-(user,month)
+    // gross before deciding on tax rate.
+    type EntryFact = {
+      row: any;
+      ms: number;
+      split: ObSplit;
+      amount: number;
+      userId: string;
+      monthKey: string; // YYYY-MM in local (Europe/Stockholm) time
+    };
+    const facts: EntryFact[] = [];
+    const grossByUserMonth = new Map<string, number>();
+    for (const r of filtered as any[]) {
+      const ms = new Date(r.end_time).getTime() - new Date(r.start_time).getTime();
+      if (ms <= 0) continue;
+      const split = splitEntryByOb(r.start_time as string, r.end_time as string, rules);
+      const uid = r.user_id as string;
+      const wage = wages.get(uid) ?? { hourly_rate: 0, ob1_pct: 0, ob2_pct: 0, ob3_pct: 0 };
+      const amount = computePay(split, wage);
+      const d = new Date(r.start_time as string);
+      const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      const gmKey = `${uid}|${monthKey}`;
+      grossByUserMonth.set(gmKey, (grossByUserMonth.get(gmKey) ?? 0) + amount);
+      facts.push({ row: r, ms, split, amount, userId: uid, monthKey });
+    }
+
+    // Load tax tables for the years involved
+    const years = new Set<number>();
+    for (const f of facts) years.add(Number(f.monthKey.slice(0, 4)));
+    const tableRowsByKey = new Map<string, Array<{
+      income_from: number; income_to: number;
+      col1: number; col2: number; col3: number; col4: number; col5: number; col6: number;
+    }>>(); // key = `${year}|${tableNumber}`
+    if (years.size > 0 && userIds.size > 0) {
+      const tableNumbers = new Set<number>();
+      for (const uid of userIds) tableNumbers.add(tableNumMap.get(uid) ?? 32);
+      const { data: tt } = await (supabaseAdmin.from("tax_tables" as any) as any)
+        .select("id, year, table_number")
+        .in("year", Array.from(years))
+        .in("table_number", Array.from(tableNumbers))
+        .eq("period", "month");
+      const tables = ((tt as any[]) ?? []);
+      if (tables.length > 0) {
+        const { data: rr } = await (supabaseAdmin.from("tax_table_rows" as any) as any)
+          .select("*")
+          .in("tax_table_id", tables.map((t: any) => t.id as string));
+        const rowsByTableId = new Map<string, any[]>();
+        for (const row of ((rr as any[]) ?? [])) {
+          const arr = rowsByTableId.get(row.tax_table_id as string) ?? [];
+          arr.push(row);
+          rowsByTableId.set(row.tax_table_id as string, arr);
+        }
+        for (const t of tables) {
+          const rows = (rowsByTableId.get(t.id as string) ?? []).sort(
+            (a: any, b: any) => a.income_from - b.income_from,
+          );
+          tableRowsByKey.set(`${t.year}|${t.table_number}`, rows);
+        }
+      }
+    }
+
+    function taxForMonth(uid: string, monthKey: string, gross: number): number {
+      const year = Number(monthKey.slice(0, 4));
+      const tableNumber = tableNumMap.get(uid) ?? 32;
+      const col = Math.max(1, Math.min(6, tableColMap.get(uid) ?? 1));
+      const rows = tableRowsByKey.get(`${year}|${tableNumber}`);
+      const grossRounded = Math.round(gross);
+      if (rows && rows.length > 0) {
+        const hit = rows.find(
+          (r) => grossRounded >= r.income_from && grossRounded <= r.income_to,
+        );
+        if (hit) {
+          const key = `col${col}` as "col1" | "col2" | "col3" | "col4" | "col5" | "col6";
+          return Number(hit[key] ?? 0);
+        }
+      }
+      // Fallback: schablon
+      const taxPct = taxMap.get(uid) ?? 30;
+      return gross * (taxPct / 100);
+    }
+
+    // Compute net rate per (user, month)
+    const netRateByUserMonth = new Map<string, number>();
+    for (const [gmKey, gross] of grossByUserMonth) {
+      const [uid, monthKey] = gmKey.split("|");
+      const tax = taxForMonth(uid, monthKey, gross);
+      const rate = gross > 0 ? Math.max(0, 1 - tax / gross) : 1;
+      netRateByUserMonth.set(gmKey, rate);
+    }
+
     const emptySplit = (): ObSplit => ({ normalMs: 0, ob1Ms: 0, ob2Ms: 0, ob3Ms: 0 });
     const addInto = (row: SummaryRow, s: ObSplit, amount: number, billing: number, employerCost: number, net: number) => {
       row.normalMs = (row.normalMs ?? 0) + s.normalMs;
@@ -950,18 +1045,17 @@ export const getSummary = createServerFn({ method: "GET" })
     let totalEmployerCost = 0;
     let totalNet = 0;
 
-    for (const r of filtered as any[]) {
-      const ms = new Date(r.end_time).getTime() - new Date(r.start_time).getTime();
-      if (ms <= 0) continue;
+    for (const f of facts) {
+      const r = f.row;
+      const ms = f.ms;
       totalMs += ms;
       totalCount += 1;
-      const split = splitEntryByOb(r.start_time as string, r.end_time as string, rules);
-      const wage = wages.get(r.user_id as string) ?? { hourly_rate: 0, ob1_pct: 0, ob2_pct: 0, ob3_pct: 0 };
-      const amount = computePay(split, wage);
+      const split = f.split;
+      const amount = f.amount;
       const feePct = feeMap.get(r.user_id as string) ?? 31.42;
-      const taxPct = taxMap.get(r.user_id as string) ?? 30;
       const employerCost = amount * (1 + feePct / 100);
-      const net = amount * (1 - taxPct / 100);
+      const netRate = netRateByUserMonth.get(`${f.userId}|${f.monthKey}`) ?? 0.7;
+      const net = amount * netRate;
       totalSplit.normalMs += split.normalMs;
       totalSplit.ob1Ms += split.ob1Ms;
       totalSplit.ob2Ms += split.ob2Ms;
