@@ -70,31 +70,60 @@ function parseTaxCsv(csv: string): {
     col6: number;
   }>;
   skipped: number;
+  sample: string[];
+  tableNumbersFound: Set<number>;
 } {
   const out: any[] = [];
   let skipped = 0;
+  const sample: string[] = [];
+  const tableNumbersFound = new Set<number>();
   const lines = csv.split(/\r?\n/);
   for (const raw of lines) {
     const line = raw.trim();
     if (!line) continue;
-    const parts = line.split(/[;,\t]/).map((p) => p.trim().replace(/\s+/g, ""));
+    // Split on ; , tab or 2+ spaces. Strip quotes and inner spaces per field.
+    const parts = line
+      .split(/[;,\t]|\s{2,}/)
+      .map((p) => p.trim().replace(/^"|"$/g, "").replace(/\s+/g, ""));
     if (parts.length < 8) {
+      if (sample.length < 3) sample.push(line);
       skipped += 1;
       continue;
     }
-    const nums = parts.slice(0, 8).map((p) => Number(p.replace(/[^0-9-]/g, "")));
+    const toNum = (s: string) => {
+      const cleaned = s.replace(/[^0-9\-]/g, "");
+      if (cleaned === "" || cleaned === "-") return NaN;
+      return Number(cleaned);
+    };
+    // Skatteverkets fil har ofta 9 kolumner: tabellnr, från, till, kol1..kol6
+    let nums: number[];
+    let tableCol: number | null = null;
+    if (parts.length >= 9) {
+      const withTable = parts.slice(0, 9).map(toNum);
+      if (withTable.every((n) => Number.isFinite(n))) {
+        tableCol = withTable[0];
+        nums = withTable.slice(1);
+      } else {
+        nums = parts.slice(0, 8).map(toNum);
+      }
+    } else {
+      nums = parts.slice(0, 8).map(toNum);
+    }
     if (nums.some((n) => !Number.isFinite(n))) {
+      if (sample.length < 3) sample.push(line);
       skipped += 1;
       continue;
     }
     const [income_from, income_to, col1, col2, col3, col4, col5, col6] = nums;
     if (income_from <= 0 || income_to < income_from) {
+      if (sample.length < 3) sample.push(line);
       skipped += 1;
       continue;
     }
-    out.push({ income_from, income_to, col1, col2, col3, col4, col5, col6 });
+    if (tableCol != null) tableNumbersFound.add(tableCol);
+    out.push({ income_from, income_to, col1, col2, col3, col4, col5, col6, __table: tableCol });
   }
-  return { rows: out, skipped };
+  return { rows: out, skipped, sample, tableNumbersFound };
 }
 
 export const importTaxTable = createServerFn({ method: "POST" })
