@@ -1,35 +1,41 @@
-## Mål
-1. Admin kan spara **personnummer** per användare.
-2. **Arbetsgivaravgiften** räknas automatiskt utifrån användarens ålder vid arbetstillfället, istället för en fast procent per användare.
+## Nedsatt arbetsgivaravgift för unga 19–23 år (fr.o.m. 2026-04-01)
 
-## Databas
-Migration som lägger till kolumnen `personal_number text` på `public.user_wages` (den enda admin-only-tabellen kopplad till användare). RLS är redan satt så bara admin ser/skriver där — personnumret exponeras inte för vanliga användare eller `anon`.
+### Regel (enligt Skatteverket / riksdagsbeslut)
+- Gäller ersättning som **betalas ut 2026-04-01 – 2027-09-30**.
+- Omfattar personer som **vid årets ingång fyllt 18 men inte 23 år** (2026 = födda **2003–2007**).
+- På lön upp till **25 000 kr/månad**: endast ålderspensionsavgift + halva övriga avgifter = **20,81 %**.
+- På den del av månadslönen som överstiger 25 000 kr: full avgift **31,42 %**.
+- Utanför perioden (före 1/4 2026 och efter 30/9 2027): full avgift som vanligt.
 
-Enkel validering i UI: 10 eller 12 siffror (ÅÅMMDD-XXXX / ÅÅÅÅMMDD-XXXX), bindestreck valfritt.
+### Ändringar i koden
 
-## Åldersregler (Skatteverket, standard)
-Ny hjälpare `src/lib/employer-fee.ts` med `employerFeePctForAge(birthDate, workDate)`:
+**1. `src/lib/employer-fee.ts`**
+- Ny konstant `YOUTH_REDUCED_PCT = 20.81` och `YOUTH_SALARY_CAP = 25000`.
+- Ny hjälpare `isYouthReductionEligible(birth, payoutDate)` – kollar född 2003–2007-motsvarande regel ("vid årets ingång fyllt 18 men inte 23") + att `payoutDate` ligger 2026-04-01 – 2027-09-30.
+- Ny funktion `employerFeeForEntry({ birth, entryDate, grossThisMonth, entryGross })` som:
+  - Om ung + inom perioden → applicerar 20,81 % på den del som ryms under 25 000 kr-taket för månaden, och 31,42 % på överskjutande.
+  - Annars faller tillbaka på befintlig `employerFeePctForAge` (0 / 10,21 / 31,42 %).
+- Returnerar `{ cost, effectivePct }` så rapporten kan visa vilken effektiv sats som använts.
 
-- **Under 15 år** → 0 %
-- **15–17 år** (fyllt 15 men inte 18 vid årets ingång) → 10,21 %
-- **18–65 år** → 31,42 %  *(full avgift)*
-- **66 år och äldre** (född tidigare år än arbetsåret − 65) → 10,21 %
-- **Född 1938 eller tidigare-motsvarighet (över 87 år)** → 0 %
+**2. `src/lib/admin.functions.ts` – `getSummary`**
+- Månadstaket på 25 000 kr är per **utbetalningsmånad**, så per användare aggregeras löpande bruttolön i månadsordning. Poster sorteras `(user_id, start_time asc)` och en `Map<userId+YYYY-MM, ackumuleradBrutto>` håller reda på hur mycket av taket som redan är förbrukat innan varje post.
+- För varje post beräknas `entryGross = timmar * timlön + OB-tillägg`, sedan anropas `employerFeeForEntry` med `grossThisMonth` (ack. före posten) → arbetsgivarkostnaden blir korrekt även när en post spänner över taket.
+- Fältet `employer_fee_pct` per rad ersätts med en beräknad effektiv sats (vägt genomsnitt om posten delas av taket).
 
-Parser `parsePersonalNumber(pn)` som returnerar `Date` eller `null` (hanterar sekelsiffra via kontrolltecken `+`/`-` och 12-siffrigt format).
+**3. UI – `src/routes/_authenticated/admin.tsx` (användardialogen)**
+- Hjälptext under "Arbetsgivaravgift (%)" uppdateras:
+  > "Ignoreras om personnummer angetts. Då beräknas 0 / 10,21 / 20,81 / 31,42 % automatiskt utifrån ålder och utbetalningsdatum (ungdomsnedsättning 19–23 år, 1 apr 2026 – 30 sep 2027, lönetak 25 000 kr/mån)."
 
-Om personnummer saknas eller är ogiltigt → använd den manuellt inmatade `employer_fee_pct` från `user_wages` som fallback (befintligt beteende bevaras).
+**4. UI – `src/routes/_authenticated/admin-summary.tsx`**
+- Liten info-rad ovanför "Arbetsgivarkostnad"-summan som förklarar att ungdomsnedsättningen är inräknad när personnummer finns.
+- (Ingen ny kolumn – vi håller det enkelt; effektiv sats syns implicit via kostnaden.)
 
-## Server / rapporter
-- `src/lib/admin.functions.ts` – `getSummary`: när `user_wages` läses in, plocka även `personal_number`. För varje tidspost räkna ut avgiftsprocenten via `employerFeePctForAge(birth, entry.started_at)`; fall tillbaka till lagrad procent om personnr saknas. Ingen ändring av returtyper.
-- `updateUserWage` / `upsertUserWage` (eller vad den heter): tar emot valfritt `personal_number` och sparar det.
+### Utanför scope (frågar om det behövs sen)
+- Växa-stödet (första anställd, 10,21 % i 24 mån).
+- Regional nedsättning för stödområde A.
+- Admin-inställningssida för att själv redigera satser/tak när Skatteverket ändrar dem.
 
-## UI
-- `src/routes/_authenticated/admin.tsx`, "Redigera användare"-dialogen:
-  - Nytt fält **"Personnummer (ÅÅÅÅMMDD-XXXX)"** överst i "Lön & OB"-boxen.
-  - Under "Arbetsgivaravgift (%)" visas hjälptext: *"Lämnas tomt om personnummer angetts — då beräknas avgiften automatiskt utifrån ålder (0 / 10,21 / 31,42 %)."*
-  - Skickar med `personal_number` när formuläret sparas.
-
-## Ingen ändring
-- Nettoskatt, skattetabeller, OB-regler, tidsregistrering och andra vyer rörs inte.
-- Personnumret visas aldrig i listor för icke-admin och exponeras aldrig till klient-RLS för vanliga användare.
+### Verifiering
+- Enhetstest-liknande sanity check i konsollen: en post på 30 000 kr brutto för en person född 2005, utbetald april 2026, ska ge arbetsgivarkostnad = 25000·1,2081 + 5000·1,3142 = **36 773 kr** (istället för 39 426 kr med full avgift).
+- Person född 2002 (fyllt 24 vid årets ingång) → oförändrat 31,42 %.
+- Post daterad mars 2026 → oförändrat 31,42 % även för född 2005.
