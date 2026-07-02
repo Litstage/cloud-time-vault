@@ -750,6 +750,8 @@ export const getAuditLog = createServerFn({ method: "GET" })
 export type SummaryFilters = {
   from: string; // ISO date YYYY-MM-DD inclusive
   to: string;   // ISO date YYYY-MM-DD inclusive
+  fromTime?: string | null; // "HH:MM"
+  toTime?: string | null;   // "HH:MM"; "00:00" or null = end of day
   userId?: string | null;
   clientId?: string | null;
   projectId?: string | null;
@@ -841,10 +843,12 @@ export const getSummary = createServerFn({ method: "GET" })
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const fromIso = new Date(`${data.from}T00:00:00`).toISOString();
-    const toIso = new Date(
-      new Date(`${data.to}T00:00:00`).getTime() + 24 * 3600 * 1000,
-    ).toISOString();
+    const fromTime = data.fromTime && /^\d{2}:\d{2}$/.test(data.fromTime) ? data.fromTime : "00:00";
+    const fromIso = new Date(`${data.from}T${fromTime}:00`).toISOString();
+    const hasToTime = data.toTime && /^\d{2}:\d{2}$/.test(data.toTime) && data.toTime !== "00:00";
+    const toIso = hasToTime
+      ? new Date(`${data.to}T${data.toTime}:00`).toISOString()
+      : new Date(new Date(`${data.to}T00:00:00`).getTime() + 24 * 3600 * 1000).toISOString();
 
     let q = supabaseAdmin
       .from("time_entries")
