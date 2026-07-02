@@ -299,7 +299,10 @@ function HomePage() {
       const start = new Date(r.start_time);
       const end = new Date(r.end_time);
       const hours = ((end.getTime() - start.getTime()) / 3600000).toFixed(2);
-      const esc = (v: string) => `"${v.replace(/"/g, '""')}"`;
+      const esc = (v: string) => {
+        const safe = /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
+        return `"${safe.replace(/"/g, '""')}"`;
+      };
       lines.push([
         esc(start.toLocaleDateString("sv-SE")),
         esc(start.toLocaleTimeString("sv-SE")),
