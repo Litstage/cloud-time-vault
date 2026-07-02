@@ -90,6 +90,7 @@ function AdminSummaryPage() {
     const esc = (v: string) => `"${v.replace(/"/g, '""')}"`;
     const lines: string[] = [];
     lines.push("Sektion,Etikett,Underetikett,Normal h,OB1 h,OB2 h,OB3 h,Totalt h,Lön kr,Debitering kr,Antal poster");
+    // Note: kept CSV shape stable; new totals visible in UI.
     const dump = (section: string, rows: SummaryRow[]) => {
       for (const r of rows) {
         lines.push([
@@ -212,20 +213,26 @@ function AdminSummaryPage() {
                 </Button>
               </div>
               {s && (
-                <div className="grid grid-cols-2 gap-2 rounded-md bg-muted/40 p-3 text-xs sm:grid-cols-6">
-                  <Stat label="Normal" value={`${fmtHours(s.totalNormalMs)} h`} />
-                  <Stat label="OB1" value={`${fmtHours(s.totalOb1Ms)} h`} />
-                  <Stat label="OB2" value={`${fmtHours(s.totalOb2Ms)} h`} />
-                  <Stat label="OB3" value={`${fmtHours(s.totalOb3Ms)} h`} />
-                  <Stat label="Lön" value={`${fmtKr(s.totalAmount)} kr`} />
-                  <Stat label="Debitering" value={`${fmtKr(s.totalBilling)} kr`} />
-                </div>
+                <>
+                  <div className="grid grid-cols-2 gap-2 rounded-md bg-muted/40 p-3 text-xs sm:grid-cols-4">
+                    <Stat label="Normal" value={`${fmtHours(s.totalNormalMs)} h`} />
+                    <Stat label="OB1" value={`${fmtHours(s.totalOb1Ms)} h`} />
+                    <Stat label="OB2" value={`${fmtHours(s.totalOb2Ms)} h`} />
+                    <Stat label="OB3" value={`${fmtHours(s.totalOb3Ms)} h`} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 rounded-md bg-muted/40 p-3 text-xs sm:grid-cols-4">
+                    <Stat label="Bruttolön" value={`${fmtKr(s.totalAmount)} kr`} />
+                    <Stat label="Netto (efter skatt)" value={`${fmtKr(s.totalNet)} kr`} />
+                    <Stat label="Arbetsgivarkostnad" value={`${fmtKr(s.totalEmployerCost)} kr`} />
+                    <Stat label="Debitering kund" value={`${fmtKr(s.totalBilling)} kr`} />
+                  </div>
+                </>
               )}
             </Card>
 
-            <SummarySection title="Per kund" rows={summaryQ.data?.perClient ?? []} loading={summaryQ.isLoading} totalMs={totalMs} showBilling />
-            <SummarySection title="Per projekt" rows={summaryQ.data?.perProject ?? []} loading={summaryQ.isLoading} totalMs={totalMs} showSwatch showBilling />
-            <SummarySection title="Per användare" rows={summaryQ.data?.perUser ?? []} loading={summaryQ.isLoading} totalMs={totalMs} showAmount />
+            <SummarySection title="Per kund" rows={summaryQ.data?.perClient ?? []} loading={summaryQ.isLoading} totalMs={totalMs} showBilling showEmployerCost />
+            <SummarySection title="Per projekt" rows={summaryQ.data?.perProject ?? []} loading={summaryQ.isLoading} totalMs={totalMs} showSwatch showBilling showEmployerCost />
+            <SummarySection title="Per användare" rows={summaryQ.data?.perUser ?? []} loading={summaryQ.isLoading} totalMs={totalMs} showAmount showEmployerCost showNet />
           </>
         )}
       </main>
@@ -242,8 +249,10 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function SummarySection({ title, rows, loading, totalMs, showSwatch, showAmount, showBilling }: {
-  title: string; rows: SummaryRow[]; loading: boolean; totalMs: number; showSwatch?: boolean; showAmount?: boolean; showBilling?: boolean;
+function SummarySection({ title, rows, loading, totalMs, showSwatch, showAmount, showBilling, showEmployerCost, showNet }: {
+  title: string; rows: SummaryRow[]; loading: boolean; totalMs: number;
+  showSwatch?: boolean; showAmount?: boolean; showBilling?: boolean;
+  showEmployerCost?: boolean; showNet?: boolean;
 }) {
   return (
     <section className="space-y-2">
@@ -271,6 +280,12 @@ function SummarySection({ title, rows, loading, totalMs, showSwatch, showAmount,
                     <div className="text-xs text-muted-foreground">{pct.toFixed(1)}% · {r.count} poster</div>
                     {showAmount && r.amount !== undefined && (
                       <div className="text-xs font-medium text-foreground">Lön: {fmtKr(r.amount)} kr</div>
+                    )}
+                    {showNet && r.net !== undefined && (
+                      <div className="text-xs text-muted-foreground">Netto: {fmtKr(r.net)} kr</div>
+                    )}
+                    {showEmployerCost && r.employerCost !== undefined && r.employerCost > 0 && (
+                      <div className="text-xs text-muted-foreground">Arb.giv.: {fmtKr(r.employerCost)} kr</div>
                     )}
                     {showBilling && r.billing !== undefined && r.billing > 0 && (
                       <div className="text-xs font-medium text-foreground">Debitering: {fmtKr(r.billing)} kr</div>
