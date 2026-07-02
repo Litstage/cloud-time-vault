@@ -580,6 +580,11 @@ function AdminPage() {
                   <Clock className="mr-2 h-4 w-4" /> OB-regler
                 </Link>
               </Button>
+              <Button asChild variant="outline">
+                <Link to="/admin-tax-tables">
+                  <Receipt className="mr-2 h-4 w-4" /> Skattetabeller
+                </Link>
+              </Button>
             </div>
             <section className="space-y-2">
               <h2 className="px-1 text-sm font-medium text-muted-foreground">Skapa användare</h2>
@@ -1047,9 +1052,20 @@ function AdminPage() {
                     <Input type="number" step="0.01" value={editEmployerFee} onChange={(e) => setEditEmployerFee(e.target.value)} />
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs">Skatt (%)</Label>
+                    <Label className="text-xs">Fallback-skatt (%)</Label>
                     <Input type="number" step="0.01" value={editTax} onChange={(e) => setEditTax(e.target.value)} />
                   </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Skattetabell (29–40)</Label>
+                    <Input type="number" min={29} max={40} step={1} value={editTaxTableNumber} onChange={(e) => setEditTaxTableNumber(e.target.value)} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Tabellkolumn (1–6)</Label>
+                    <Input type="number" min={1} max={6} step={1} value={editTaxTableColumn} onChange={(e) => setEditTaxTableColumn(e.target.value)} />
+                  </div>
+                </div>
+                <div className="mt-2 text-[11px] text-muted-foreground">
+                  Netto beräknas per kalendermånad från Skatteverkets tabell. Faller tillbaka på fallback-procenten om tabellen saknas för året.
                 </div>
               </div>
             </div>
@@ -1087,6 +1103,8 @@ function AdminPage() {
                   ob3_pct: Number(editOb3) || 0,
                   employer_fee_pct: Number(editEmployerFee) || 0,
                   tax_pct: Number(editTax) || 0,
+                  tax_table_number: Math.max(29, Math.min(40, Number(editTaxTableNumber) || 32)),
+                  tax_table_column: Math.max(1, Math.min(6, Number(editTaxTableColumn) || 1)),
                 });
                 updateMut.mutate(payload);
               }}
