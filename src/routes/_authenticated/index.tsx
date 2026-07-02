@@ -244,12 +244,14 @@ function HomePage() {
     qc.invalidateQueries({ queryKey: ["entries"] });
   }
 
-  async function deleteEntry(id: string) {
-    if (actingOnOther) {
+  async function deleteEntry(e: Entry) {
+    const id = e.id;
+    const isOtherRow = !!e.user_id && !!selfUserId && e.user_id !== selfUserId;
+    if (actingOnOther || isOtherRow) {
       try {
-        await deleteOtherFn({ data: { id } });
-      } catch (e) {
-        return toast.error(e instanceof Error ? e.message : "Kunde inte ta bort");
+        await adminDeleteFn({ data: { id } });
+      } catch (err) {
+        return toast.error(err instanceof Error ? err.message : "Kunde inte ta bort");
       }
     } else {
       const { error } = await supabase.from("time_entries").delete().eq("id", id);
