@@ -1033,6 +1033,19 @@ function AdminPage() {
               </div>
               <div className="rounded-md border p-3">
                 <div className="mb-2 text-xs font-medium uppercase text-muted-foreground">Lön & OB</div>
+                <div className="mb-3 space-y-1">
+                  <Label className="text-xs">Personnummer (ÅÅÅÅMMDD-XXXX)</Label>
+                  <Input
+                    value={editPersonalNumber}
+                    onChange={(e) => setEditPersonalNumber(e.target.value)}
+                    placeholder="19801231-1234"
+                    inputMode="numeric"
+                    autoComplete="off"
+                  />
+                  <div className="text-[11px] text-muted-foreground">
+                    Används för att automatiskt beräkna arbetsgivaravgift utifrån ålder.
+                  </div>
+                </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <Label className="text-xs">Timlön (kr)</Label>
@@ -1053,6 +1066,9 @@ function AdminPage() {
                   <div className="space-y-1">
                     <Label className="text-xs">Arbetsgivaravgift (%)</Label>
                     <Input type="number" step="0.01" value={editEmployerFee} onChange={(e) => setEditEmployerFee(e.target.value)} />
+                    <div className="text-[11px] text-muted-foreground">
+                      Ignoreras om personnummer angetts – då används 0 / 10,21 / 31,42 % beroende på ålder.
+                    </div>
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Fallback-skatt (%)</Label>
