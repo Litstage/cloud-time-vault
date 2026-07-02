@@ -419,7 +419,7 @@ function AdminSummaryPage() {
                       <CostToggle label="Netto efter skatt" checked={showNet} onChange={setShowNet} />
                       <CostToggle label="Arbetsgivarkostnad" checked={showEmployer} onChange={setShowEmployer} />
                       <CostToggle label="Debitering kund" checked={showBilling} onChange={setShowBilling} />
-                      <CostToggle label="OB-timmar" checked={showOb} onChange={setShowOb} />
+                      <CostToggle label="OB (kr)" checked={showOb} onChange={setShowOb} />
                       <div className="border-t pt-2">
                         <div className="mb-1 text-xs font-medium text-muted-foreground">Kategorier</div>
                         <CostToggle label="Per kund" checked={showPerClient} onChange={setShowPerClient} />
