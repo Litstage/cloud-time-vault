@@ -362,6 +362,16 @@ function HomePage() {
     return totals;
   }, [grouped]);
 
+  const summaryTotals = useMemo(() => {
+    let totalMs = 0;
+    let entryCount = 0;
+    for (const [day, list] of grouped) {
+      totalMs += totals.get(day) ?? 0;
+      entryCount += list.length;
+    }
+    return { totalMs, entryCount };
+  }, [grouped, totals]);
+
   return (
     <div className="min-h-screen bg-background pb-12 safe-bottom">
       <header className="sticky top-0 z-10 border-b bg-background/80 backdrop-blur safe-top">
