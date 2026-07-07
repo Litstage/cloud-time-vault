@@ -644,53 +644,65 @@ function HomePage() {
               Inga tidsposter i vald period.
             </Card>
           ) : (
-            grouped.map(([day, list]) => (
-              <div key={day} className="space-y-2">
-                <div className="flex items-center justify-between px-1 text-xs">
-                  <span className="font-medium capitalize text-foreground">{day}</span>
-                  <span className="font-mono tabular-nums text-muted-foreground">
-                    {formatDuration(totals.get(day) ?? 0)}
-                  </span>
-                </div>
-                <Card className="divide-y overflow-hidden p-0">
-                  {list.map((e) => {
-                    const dur = new Date(e.end_time!).getTime() - new Date(e.start_time).getTime();
-                    const ownerName = e.user_id && e.user_id !== selfUserId
-                      ? nameOf({ first_name: e.user_first_name, last_name: e.user_last_name, email: e.user_email, user_id: e.user_id })
-                      : null;
-                    return (
-                      <div key={e.id} className="flex items-center gap-3 px-4 py-3">
-                        <div className="h-8 w-1 rounded-full" style={{ background: e.projects?.color ?? "var(--muted-foreground)" }} />
-                        <button
-                          type="button"
-                          onClick={() => { setEditEntry(e); setManualOpen(true); }}
-                          className="min-w-0 flex-1 text-left"
-                        >
-                          {ownerName && (
-                            <div className="mb-0.5 flex items-center gap-1">
-                              <Badge variant="secondary" className="h-5 px-1.5 text-[10px] font-medium">
-                                {ownerName}
-                              </Badge>
+            <>
+              {grouped.map(([day, list]) => (
+                <div key={day} className="space-y-2">
+                  <div className="flex items-center justify-between px-1 text-xs">
+                    <span className="font-medium capitalize text-foreground">{day}</span>
+                    <span className="font-mono tabular-nums text-muted-foreground">
+                      {formatDuration(totals.get(day) ?? 0)}
+                    </span>
+                  </div>
+                  <Card className="divide-y overflow-hidden p-0">
+                    {list.map((e) => {
+                      const dur = new Date(e.end_time!).getTime() - new Date(e.start_time).getTime();
+                      const ownerName = e.user_id && e.user_id !== selfUserId
+                        ? nameOf({ first_name: e.user_first_name, last_name: e.user_last_name, email: e.user_email, user_id: e.user_id })
+                        : null;
+                      return (
+                        <div key={e.id} className="flex items-center gap-3 px-4 py-3">
+                          <div className="h-8 w-1 rounded-full" style={{ background: e.projects?.color ?? "var(--muted-foreground)" }} />
+                          <button
+                            type="button"
+                            onClick={() => { setEditEntry(e); setManualOpen(true); }}
+                            className="min-w-0 flex-1 text-left"
+                          >
+                            {ownerName && (
+                              <div className="mb-0.5 flex items-center gap-1">
+                                <Badge variant="secondary" className="h-5 px-1.5 text-[10px] font-medium">
+                                  {ownerName}
+                                </Badge>
+                              </div>
+                            )}
+                            <div className="truncate text-sm font-medium">{e.description || "Ingen beskrivning"}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {e.projects?.name ?? "Inget projekt"} · {new Date(e.start_time).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" })}–{new Date(e.end_time!).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" })}
                             </div>
-                          )}
-                          <div className="truncate text-sm font-medium">{e.description || "Ingen beskrivning"}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {e.projects?.name ?? "Inget projekt"} · {new Date(e.start_time).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" })}–{new Date(e.end_time!).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" })}
-                          </div>
-                        </button>
-                        <div className="font-mono text-sm tabular-nums">{formatDuration(dur)}</div>
-                        <Button variant="ghost" size="icon" onClick={() => { setEditEntry(e); setManualOpen(true); }}>
-                          <Pencil className="h-4 w-4 text-muted-foreground" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => deleteEntry(e)}>
-                          <Trash2 className="h-4 w-4 text-muted-foreground" />
-                        </Button>
-                      </div>
-                    );
-                  })}
-                </Card>
-              </div>
-            ))
+                          </button>
+                          <div className="font-mono text-sm tabular-nums">{formatDuration(dur)}</div>
+                          <Button variant="ghost" size="icon" onClick={() => { setEditEntry(e); setManualOpen(true); }}>
+                            <Pencil className="h-4 w-4 text-muted-foreground" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => deleteEntry(e)}>
+                            <Trash2 className="h-4 w-4 text-muted-foreground" />
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </Card>
+                </div>
+              ))}
+              <Card className="flex items-center justify-between border-t bg-background/95 p-4 backdrop-blur">
+                <div>
+                  <div className="text-xs uppercase tracking-wider text-muted-foreground">Total tid</div>
+                  <div className="font-mono text-2xl font-semibold tabular-nums">{formatHours(summaryTotals.totalMs)} h</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-xs uppercase tracking-wider text-muted-foreground">Antal poster</div>
+                  <div className="font-mono text-2xl font-semibold tabular-nums">{summaryTotals.entryCount}</div>
+                </div>
+              </Card>
+            </>
           )}
         </section>
       </main>
