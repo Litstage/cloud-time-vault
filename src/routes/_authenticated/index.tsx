@@ -68,6 +68,10 @@ function formatDuration(ms: number) {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
+function formatHours(ms: number) {
+  return (ms / 3600000).toFixed(2);
+}
+
 function getIsoWeek(date: Date) {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
   const day = d.getUTCDay() || 7;
