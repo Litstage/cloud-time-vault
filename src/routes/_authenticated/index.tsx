@@ -993,7 +993,7 @@ function ManualEntryDialog({ open, onOpenChange, projects, actingOnOther, target
 
 const COLORS = ["#ef4444", "#f97316", "#eab308", "#22c55e", "#06b6d4", "#6366f1", "#ec4899", "#8b5cf6"];
 
-function TimeField({ value, onChange, valid }: { value: string; onChange: (v: string) => void; valid: boolean }) {
+function TimeField({ value, onChange, valid, placeholder = "HH:MM" }: { value: string; onChange: (v: string) => void; valid: boolean; placeholder?: string }) {
   const [open, setOpen] = useState(false);
   const options: string[] = [];
   for (let h = 0; h < 24; h++) {
@@ -1006,7 +1006,7 @@ function TimeField({ value, onChange, valid }: { value: string; onChange: (v: st
       <Input
         type="text"
         inputMode="numeric"
-        placeholder="HH:MM"
+        placeholder={placeholder}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className={cn("h-12 text-base flex-1 min-w-0", !valid && "border-destructive")}
