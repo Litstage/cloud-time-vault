@@ -807,12 +807,16 @@ function ManualEntryDialog({ open, onOpenChange, projects, actingOnOther, target
 
   const startNorm = normalizeTime(start);
   const endNorm = normalizeTime(end);
+  const todayStr = (() => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`; })();
+  const endOptional = !isEdit && dateText === todayStr;
+  const endEmpty = end.trim() === "";
 
   async function save() {
     if (!dateValid) return toast.error("Ogiltigt datum");
     if (!startNorm) return toast.error("Ogiltig starttid");
-    if (!endNorm) return toast.error("Ogiltig sluttid");
+    if (!endNorm && !(endOptional && endEmpty)) return toast.error("Ogiltig sluttid");
     const isoDay = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    if (isEdit && !endNorm) return toast.error("Ogiltig sluttid");
     if (isEdit && editEntry) {
       if (effectiveActingOnOther) {
         try {
@@ -852,20 +856,24 @@ function ManualEntryDialog({ open, onOpenChange, projects, actingOnOther, target
       onOpenChange(false);
       return;
     }
+    const startIsoNew = new Date(`${isoDay}T${startNorm}`).toISOString();
+    let endIsoNew: string | null = null;
+    if (endNorm) {
+      let endDate = new Date(`${isoDay}T${endNorm}`);
+      if (endDate.getTime() <= new Date(startIsoNew).getTime()) {
+        endDate = new Date(endDate.getTime() + 24 * 3600 * 1000);
+      }
+      endIsoNew = endDate.toISOString();
+    }
     if (actingOnOther && targetUserId) {
       try {
-        const startIso = new Date(`${isoDay}T${startNorm}`).toISOString();
-        let endDate = new Date(`${isoDay}T${endNorm}`);
-        if (endDate.getTime() <= new Date(startIso).getTime()) {
-          endDate = new Date(endDate.getTime() + 24 * 3600 * 1000);
-        }
         await adminCreate({
           data: {
             userId: targetUserId,
             projectId: projectId === "none" ? null : projectId,
             description: description || null,
-            startIso,
-            endIso: endDate.toISOString(),
+            startIso: startIsoNew,
+            endIso: endIsoNew,
           },
         });
       } catch (e) {
@@ -874,20 +882,32 @@ function ManualEntryDialog({ open, onOpenChange, projects, actingOnOther, target
     } else {
       const { data: u } = await supabase.auth.getUser();
       if (!u.user) return;
-      const startIso = new Date(`${isoDay}T${startNorm}`).toISOString();
-      let endDate = new Date(`${isoDay}T${endNorm}`);
-      if (endDate.getTime() <= new Date(startIso).getTime()) {
-        endDate = new Date(endDate.getTime() + 24 * 3600 * 1000);
+      if (!endIsoNew) {
+        const { data: open } = await supabase
+          .from("time_entries")
+          .select("id")
+          .eq("user_id", u.user.id)
+          .is("end_time", null)
+          .limit(1);
+        if (open && open.length > 0) {
+          return toast.error("Det finns redan en pågående stämpling – stoppa den först.");
+        }
       }
-      const endIso = endDate.toISOString();
       const { error } = await supabase.from("time_entries").insert({
         user_id: u.user.id,
         description: description || null,
         project_id: projectId === "none" ? null : projectId,
-        start_time: startIso,
-        end_time: endIso,
+        start_time: startIsoNew,
+        end_time: endIsoNew,
       });
       if (error) return toast.error(error.message);
+    }
+    if (!endIsoNew) {
+      toast.success("Instämplad");
+      qc.invalidateQueries({ queryKey: ["entries"] });
+      onOpenChange(false);
+      setDescription("");
+      return;
     }
     toast.success("Tid tillagd");
     qc.invalidateQueries({ queryKey: ["entries"] });
@@ -939,8 +959,8 @@ function ManualEntryDialog({ open, onOpenChange, projects, actingOnOther, target
               <TimeField value={start} onChange={setStart} valid={!!startNorm} />
             </div>
             <div className="space-y-2">
-              <Label className="text-base">Slut</Label>
-              <TimeField value={end} onChange={setEnd} valid={!!endNorm} />
+              <Label className="text-base">Slut{endOptional && <span className="text-xs text-muted-foreground font-normal"> (valfritt idag)</span>}</Label>
+              <TimeField value={end} onChange={setEnd} valid={!!endNorm || (endOptional && endEmpty)} placeholder={endOptional ? "Pågående" : "HH:MM"} />
             </div>
           </div>
           <div className="space-y-2">
