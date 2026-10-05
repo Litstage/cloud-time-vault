@@ -489,13 +489,30 @@ export const adminCreateTimeEntry = createServerFn({ method: "POST" })
       projectId: string | null;
       description: string | null;
       startIso: string;
-      endIso: string;
+      endIso: string | null;
     }) => d,
   )
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
-    const { start, end } = validateIsoRange(data.startIso, data.endIso);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    let start: string;
+    let end: string | null = null;
+    if (data.endIso) {
+      ({ start, end } = validateIsoRange(data.startIso, data.endIso));
+    } else {
+      const s = new Date(data.startIso);
+      if (isNaN(s.getTime())) throw new Error("Ogiltigt datum/tid");
+      start = s.toISOString();
+      const { data: open } = await supabaseAdmin
+        .from("time_entries")
+        .select("id")
+        .eq("user_id", data.userId)
+        .is("end_time", null)
+        .limit(1);
+      if (open && open.length > 0) {
+        throw new Error("Det finns redan en pågående stämpling – stoppa den först.");
+      }
+    }
     const payload = {
       user_id: data.userId,
       project_id: data.projectId,

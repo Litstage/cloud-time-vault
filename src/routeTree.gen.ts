@@ -9,23 +9,23 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
+import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
-import { Route as AuthenticatedOverviewRouteImport } from './routes/_authenticated/overview'
-import { Route as AuthenticatedAdminTaxTablesRouteImport } from './routes/_authenticated/admin-tax-tables'
-import { Route as AuthenticatedAdminSummaryRouteImport } from './routes/_authenticated/admin-summary'
-import { Route as AuthenticatedAdminProjectsRouteImport } from './routes/_authenticated/admin-projects'
-import { Route as AuthenticatedAdminObRouteImport } from './routes/_authenticated/admin-ob'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
+import { Route as AuthenticatedAdminObRouteImport } from './routes/_authenticated/admin-ob'
+import { Route as AuthenticatedAdminProjectsRouteImport } from './routes/_authenticated/admin-projects'
+import { Route as AuthenticatedAdminSummaryRouteImport } from './routes/_authenticated/admin-summary'
+import { Route as AuthenticatedAdminTaxTablesRouteImport } from './routes/_authenticated/admin-tax-tables'
+import { Route as AuthenticatedOverviewRouteImport } from './routes/_authenticated/overview'
 
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
-  id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
@@ -33,15 +33,20 @@ const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedOverviewRoute = AuthenticatedOverviewRouteImport.update({
-  id: '/overview',
-  path: '/overview',
+const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedAdminTaxTablesRoute =
-  AuthenticatedAdminTaxTablesRouteImport.update({
-    id: '/admin-tax-tables',
-    path: '/admin-tax-tables',
+const AuthenticatedAdminObRoute = AuthenticatedAdminObRouteImport.update({
+  id: '/admin-ob',
+  path: '/admin-ob',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedAdminProjectsRoute =
+  AuthenticatedAdminProjectsRouteImport.update({
+    id: '/admin-projects',
+    path: '/admin-projects',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedAdminSummaryRoute =
@@ -50,20 +55,15 @@ const AuthenticatedAdminSummaryRoute =
     path: '/admin-summary',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AuthenticatedAdminProjectsRoute =
-  AuthenticatedAdminProjectsRouteImport.update({
-    id: '/admin-projects',
-    path: '/admin-projects',
+const AuthenticatedAdminTaxTablesRoute =
+  AuthenticatedAdminTaxTablesRouteImport.update({
+    id: '/admin-tax-tables',
+    path: '/admin-tax-tables',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AuthenticatedAdminObRoute = AuthenticatedAdminObRouteImport.update({
-  id: '/admin-ob',
-  path: '/admin-ob',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
-  id: '/admin',
-  path: '/admin',
+const AuthenticatedOverviewRoute = AuthenticatedOverviewRouteImport.update({
+  id: '/overview',
+  path: '/overview',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 
@@ -140,18 +140,18 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/auth': {
-      id: '/auth'
-      path: '/auth'
-      fullPath: '/auth'
-      preLoaderRoute: typeof AuthRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/_authenticated': {
       id: '/_authenticated'
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof AuthenticatedRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/': {
@@ -161,32 +161,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/overview': {
-      id: '/_authenticated/overview'
-      path: '/overview'
-      fullPath: '/overview'
-      preLoaderRoute: typeof AuthenticatedOverviewRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/admin-tax-tables': {
-      id: '/_authenticated/admin-tax-tables'
-      path: '/admin-tax-tables'
-      fullPath: '/admin-tax-tables'
-      preLoaderRoute: typeof AuthenticatedAdminTaxTablesRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/admin-summary': {
-      id: '/_authenticated/admin-summary'
-      path: '/admin-summary'
-      fullPath: '/admin-summary'
-      preLoaderRoute: typeof AuthenticatedAdminSummaryRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/admin-projects': {
-      id: '/_authenticated/admin-projects'
-      path: '/admin-projects'
-      fullPath: '/admin-projects'
-      preLoaderRoute: typeof AuthenticatedAdminProjectsRouteImport
+    '/_authenticated/admin': {
+      id: '/_authenticated/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AuthenticatedAdminRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/admin-ob': {
@@ -196,11 +175,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminObRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/admin': {
-      id: '/_authenticated/admin'
-      path: '/admin'
-      fullPath: '/admin'
-      preLoaderRoute: typeof AuthenticatedAdminRouteImport
+    '/_authenticated/admin-projects': {
+      id: '/_authenticated/admin-projects'
+      path: '/admin-projects'
+      fullPath: '/admin-projects'
+      preLoaderRoute: typeof AuthenticatedAdminProjectsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/admin-summary': {
+      id: '/_authenticated/admin-summary'
+      path: '/admin-summary'
+      fullPath: '/admin-summary'
+      preLoaderRoute: typeof AuthenticatedAdminSummaryRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/admin-tax-tables': {
+      id: '/_authenticated/admin-tax-tables'
+      path: '/admin-tax-tables'
+      fullPath: '/admin-tax-tables'
+      preLoaderRoute: typeof AuthenticatedAdminTaxTablesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/overview': {
+      id: '/_authenticated/overview'
+      path: '/overview'
+      fullPath: '/overview'
+      preLoaderRoute: typeof AuthenticatedOverviewRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
   }
